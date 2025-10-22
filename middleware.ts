@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
-import { AuthMiddleware } from '@/core/middleware/middleware';
+import { AuthMiddleware } from './src/core/middleware/middleware';
 
 export default async function middleware(request: NextRequest) {
+    console.log('🔍 Middleware triggered for:', request.nextUrl.pathname);
     return await AuthMiddleware(request);
 }
 

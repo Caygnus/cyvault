@@ -43,7 +43,8 @@ const PROTECTED_ROUTES = [
 const PROTECTED_API_ROUTES = [
     '/api/protected',
     '/api/user',
-    '/api/admin'
+    '/api/admin',
+    '/api/test'
 ];
 
 /**
@@ -90,26 +91,40 @@ function isPageRoute(pathname: string): boolean {
  * Get user from Supabase session
  */
 async function getCurrentUser(request: NextRequest) {
-    const supabase = createServerClient(
-        process.env.SUPABASE_URL!,
-        process.env.SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                get(name: string) {
-                    return request.cookies.get(name)?.value;
+    try {
+        console.log('🔧 Creating Supabase client...');
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    get(name: string) {
+                        return request.cookies.get(name)?.value;
+                    },
+                    set() {
+                        // No-op for middleware
+                    },
+                    remove() {
+                        // No-op for middleware
+                    },
                 },
-                set() {
-                    // No-op for middleware
-                },
-                remove() {
-                    // No-op for middleware
-                },
-            },
-        }
-    );
+            }
+        );
 
-    const { data: { user } } = await supabase.auth.getUser();
-    return user;
+        console.log('🔍 Getting user from Supabase...');
+        const { data: { user }, error } = await supabase.auth.getUser();
+
+        if (error) {
+            console.error('❌ Supabase auth error:', error);
+            return null;
+        }
+
+        console.log('👤 User data:', user ? { id: user.id, email: user.email } : 'null');
+        return user;
+    } catch (error) {
+        console.error('❌ Error in getCurrentUser:', error);
+        return null;
+    }
 }
 
 /**
@@ -141,39 +156,53 @@ function setUserContext(request: NextRequest, user: User): void {
  * Authentication middleware
  */
 export async function AuthMiddleware(request: NextRequest): Promise<NextResponse> {
-    const pathname = request.nextUrl.pathname;
+    try {
+        const pathname = request.nextUrl.pathname;
+        console.log('🔍 Processing route:', pathname);
 
-    // 1. Check if route needs authentication
-    if (!isRouteProtected(pathname)) {
+        // 1. Check if route needs authentication
+        if (!isRouteProtected(pathname)) {
+            console.log('✅ Route is not protected:', pathname);
+            return NextResponse.next();
+        }
+
+        console.log('🔒 Route is protected:', pathname);
+
+        // 2. Get current user
+        const user = await getCurrentUser(request);
+        console.log('👤 User found:', user ? 'Yes' : 'No');
+
+        // 3. Check if user is authenticated
+        if (!user || !user.id) {
+            console.log('❌ User not authenticated, redirecting to login');
+            // 4. Check if request is for page or API
+            if (isPageRoute(pathname)) {
+                // 5. Redirect to login page
+                const loginUrl = new URL('/login', request.url);
+                loginUrl.searchParams.set('redirect', pathname);
+                console.log('🔄 Redirecting to:', loginUrl.toString());
+                return NextResponse.redirect(loginUrl);
+            } else {
+                // 6. Return 401 for API
+                console.log('🚫 Returning 401 for API');
+                return new NextResponse(
+                    JSON.stringify({ error: 'Unauthorized' }),
+                    {
+                        status: 401,
+                        headers: { 'Content-Type': 'application/json' }
+                    }
+                );
+            }
+        }
+
+        // 7. Allow request and attach user context to request
+        console.log('✅ User authenticated, setting context');
+        setUserContext(request, user);
+        return NextResponse.next();
+    } catch (error) {
+        console.error('❌ Middleware error:', error);
         return NextResponse.next();
     }
-
-    // 2. Get current user
-    const user = await getCurrentUser(request);
-
-    // 3. Check if user is authenticated
-    if (!user || !user.id) {
-        // 4. Check if request is for page or API
-        if (isPageRoute(pathname)) {
-            // 5. Redirect to login page
-            const loginUrl = new URL('/login', request.url);
-            loginUrl.searchParams.set('redirect', pathname);
-            return NextResponse.redirect(loginUrl);
-        } else {
-            // 6. Return 401 for API
-            return new NextResponse(
-                JSON.stringify({ error: 'Unauthorized' }),
-                {
-                    status: 401,
-                    headers: { 'Content-Type': 'application/json' }
-                }
-            );
-        }
-    }
-
-    // 7. Allow request and attach user context to request
-    setUserContext(request, user);
-    return NextResponse.next();
 }
 
 /**

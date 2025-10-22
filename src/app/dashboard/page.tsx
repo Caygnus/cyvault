@@ -2,8 +2,16 @@ import { headers } from 'next/headers';
 import { getUserContext } from '@/core/middleware/helpers';
 
 export default async function DashboardPage() {
-    // Get user context from headers (set by middleware)
-    const userContext = getUserContext({ headers: headers() } as any);
+    let userContext;
+
+    try {
+        // Get user context from headers (set by middleware)
+        const headersList = await headers();
+        userContext = getUserContext({ headers: headersList } as any);
+    } catch (error) {
+        console.error('Dashboard error:', error);
+        userContext = { isAuthenticated: false };
+    }
 
     return (
         <div className="p-8">
