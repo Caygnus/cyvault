@@ -17,6 +17,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.76.1",
+    "@tanstack/react-query-devtools": "^5.90.2",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.6",
     "framer-motion": "^12.23.24",
