@@ -5,14 +5,10 @@ import { AUTH_ERRORS } from './types'
 
 // Environment variables with validation
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseAdminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl) {
+if (!supabaseUrl || !supabaseAdminKey) {
     throw new Error(AUTH_ERRORS.MISSING_URL);
-}
-
-if (!supabaseAnonKey) {
-    throw new Error(AUTH_ERRORS.MISSING_ANON_KEY);
 }
 
 /**
@@ -22,7 +18,7 @@ if (!supabaseAnonKey) {
 export async function createClient() {
     const cookieStore = await cookies()
 
-    return createServerClient(supabaseUrl!, supabaseAnonKey!, {
+    return createServerClient(supabaseUrl!, supabaseAdminKey!, {
         cookies: {
             getAll() {
                 return cookieStore.getAll()

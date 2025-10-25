@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Github, Twitter } from "lucide-react"
 import { supabase } from "@/core/supabase/client"
 
-export default function LoginPage() {
+function LoginForm() {
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
@@ -171,5 +171,28 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+                <div className="w-full max-w-md">
+                    <div className="bg-white rounded-2xl shadow-xl p-8">
+                        <div className="text-center">
+                            <div className="w-12 h-12 bg-linear-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                </svg>
+                            </div>
+                            <h1 className="text-2xl font-bold text-gray-900 mb-2">Loading...</h1>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }>
+            <LoginForm />
+        </Suspense>
     )
 }
