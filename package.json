@@ -8,13 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:migrate": "node scripts/migrate.js",
     "db:push": "npx drizzle-kit push",
-    "db:generate": "npx drizzle-kit generate",
-    "db:migrate": "npx drizzle-kit migrate",
-    "db:pull": "npx drizzle-kit pull",
-    "db:export": "npx drizzle-kit export",
-    "db:update": "npm run db:generate && npm run db:migrate",
-    "db:safe-migrate": "node scripts/safe-migrate.js",
     "db:rollback": "node scripts/rollback.js"
   },
   "dependencies": {

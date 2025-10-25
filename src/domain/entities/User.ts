@@ -6,6 +6,8 @@ export class UserEntity {
         public readonly name: string,
         public readonly email: string,
         public readonly avatarUrl: string | null,
+        public readonly createdBy: string | null,
+        public readonly updatedBy: string | null,
         public readonly createdAt: Date | null,
         public readonly updatedAt: Date | null
     ) { }
@@ -16,6 +18,8 @@ export class UserEntity {
             user.name,
             user.email,
             user.avatarUrl,
+            user.createdBy,
+            user.updatedBy,
             user.createdAt,
             user.updatedAt
         );
@@ -26,6 +30,8 @@ export class UserEntity {
             name: this.name,
             email: this.email,
             avatarUrl: this.avatarUrl,
+            createdBy: this.createdBy,
+            updatedBy: this.updatedBy,
             createdAt: this.createdAt,
             updatedAt: this.updatedAt,
         };
