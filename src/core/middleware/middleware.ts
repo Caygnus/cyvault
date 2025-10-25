@@ -1,119 +1,277 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+import type { User } from '@supabase/supabase-js';
+import { AUTH_ERRORS } from '../supabase/types';
 
-// Import optimized modules
-import { RouteType, UserHeaders } from './config';
-import { isRouteProtected, getRouteType } from './route-matcher';
-import {
-    getCurrentUser,
-    setUserContext,
-    createUnauthorizedResponse,
-    createRedirectResponse,
-    isUserAuthenticated
-} from './auth-utils';
-import { logger } from './logger';
+export const UserHeaders = {
+    USER_ID: 'x-user-id',
+    USER_EMAIL: 'x-user-email',
+    TENANT_ID: 'x-tenant-id'
+} as const;
 
-/**
- * Authentication middleware - Optimized version
- */
-export async function AuthMiddleware(request: NextRequest): Promise<NextResponse> {
-    const pathname = request.nextUrl.pathname;
+export const RouteType = {
+    PAGE: 'page',
+    API: 'api'
+} as const;
 
-    logger.info(pathname);
+export const PROTECTED_ROUTES = [
+    '/',
+    '/dashboard',
+    '/profile',
+    '/settings',
+    '/admin'
+] as const;
 
-    try {
-        // 1. Early return for non-protected routes
-        if (!isRouteProtected(pathname)) {
-            logger.info(pathname);
+export const PUBLIC_API_ROUTES = [
+    '/api/auth',
+    '/api/health',
+] as const;
+
+export const PUBLIC_ROUTES = [
+    '/login',
+    '/signup',
+    '/forgot-password',
+    '/reset-password',
+    '/_next',
+    '/favicon.ico'
+] as const;
+
+const ROUTE_PATTERNS = {
+    API: /^\/api\//,
+    STATIC: /\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$/,
+    NEXT_INTERNAL: /^\/_next\//,
+} as const;
+
+type CookieData = {
+    name: string;
+    value: string;
+    options?: Record<string, unknown>;
+};
+
+export class MiddlewareService {
+    static async handleRequest(request: NextRequest): Promise<NextResponse> {
+        const pathname = request.nextUrl.pathname;
+
+        try {
+            if (!this.isRouteProtected(pathname)) {
+                return NextResponse.next();
+            }
+
+            const { user } = await this.getCurrentUser(request);
+
+            if (!this.isUserAuthenticated(user)) {
+                return this.handleUnauthenticatedRequest(request, pathname);
+            }
+
+            return this.setUserContext(request, user!);
+
+        } catch {
             return NextResponse.next();
         }
+    }
 
-        logger.info(pathname);
+    private static async getCurrentUser(request: NextRequest): Promise<{ user: User | null; response: NextResponse }> {
+        try {
+            const response = NextResponse.next({
+                request: {
+                    headers: request.headers,
+                },
+            });
 
-        // 2. Get current user with optimized error handling
-        const { user, response } = await getCurrentUser(request);
-        logger.info(`User found: ${user ? user.id : 'not found'}`);
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+            const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-        // 3. Check authentication status
-        if (!isUserAuthenticated(user)) {
-            logger.info('User not authenticated');
-            return handleUnauthenticatedRequest(request, pathname);
+            if (!supabaseUrl || !supabaseAnonKey) {
+                return { user: null, response: NextResponse.next() };
+            }
+
+            const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+                cookies: {
+                    getAll() {
+                        return request.cookies.getAll();
+                    },
+                    setAll(cookiesToSet: CookieData[]) {
+                        try {
+                            cookiesToSet.forEach(({ name, value, options }) => {
+                                request.cookies.set(name, value);
+                                response.cookies.set(name, value, options);
+                            });
+                        } catch {
+                            // Silent fail for cookie setting
+                        }
+                    },
+                },
+            });
+
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+            if (userError) {
+                return { user: null, response };
+            }
+
+            return { user, response };
+        } catch {
+            return { user: null, response: NextResponse.next() };
+        }
+    }
+
+    private static setUserContext(request: NextRequest, user: User): NextResponse {
+        if (!user) return NextResponse.next();
+
+        const response = NextResponse.next({
+            request: {
+                headers: request.headers,
+            },
+        });
+
+        request.headers.set(UserHeaders.USER_ID, user.id || '');
+        request.headers.set(UserHeaders.USER_EMAIL, user.email || '');
+
+        const tenantId = this.extractTenantIdFromUser(user);
+        if (tenantId) {
+            request.headers.set(UserHeaders.TENANT_ID, tenantId);
         }
 
-        // 4. User is authenticated - set context and proceed
-        logger.info(`User authenticated: ${user!.id}`);
-        return setUserContext(request, user!);
+        response.headers.set(UserHeaders.USER_ID, user.id || '');
+        response.headers.set(UserHeaders.USER_EMAIL, user.email || '');
+        if (tenantId) {
+            response.headers.set(UserHeaders.TENANT_ID, tenantId);
+        }
 
-    } catch (error) {
-        logger.error(error as string);
-        return NextResponse.next();
+        return response;
     }
-}
 
-/**
- * Handle unauthenticated requests based on route type
- */
-function handleUnauthenticatedRequest(request: NextRequest, pathname: string): NextResponse {
-    const routeType = getRouteType(pathname);
+    private static handleUnauthenticatedRequest(request: NextRequest, pathname: string): NextResponse {
+        const routeType = this.getRouteType(pathname);
 
-    if (routeType === RouteType.PAGE) {
-        logger.info('Redirecting to login');
-        return createRedirectResponse(request, pathname);
-    } else {
-        logger.info('Returning unauthorized');
-        return createUnauthorizedResponse();
+        if (routeType === RouteType.PAGE) {
+            const loginUrl = new URL('/login', request.url);
+            loginUrl.searchParams.set('redirect', pathname);
+            return NextResponse.redirect(loginUrl);
+        } else {
+            return new NextResponse(
+                JSON.stringify({
+                    error: AUTH_ERRORS.UNAUTHORIZED,
+                    message: 'Authentication required',
+                    code: 'UNAUTHORIZED',
+                    timestamp: new Date().toISOString()
+                }),
+                {
+                    status: 401,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    }
+                }
+            );
+        }
     }
-}
 
-/**
- * Helper methods for getting user context from request headers
- * These methods can be used in API routes and Server Components
- */
-export const UserContext = {
-    /**
-     * Get current user ID from request headers
-     */
-    getCurrentUserId(request: NextRequest): string | null {
+    private static extractTenantIdFromUser(user: User | null): string | null {
+        if (!user) return null;
+        const userMetadata = user.user_metadata || {};
+        const appMetadata = user.app_metadata || {};
+        return userMetadata.tenant_id || appMetadata.tenant_id || null;
+    }
+
+    static isUserAuthenticated(user: User | null): boolean {
+        return !!(user && user.id);
+    }
+
+    private static matchesRoute(pathname: string, route: string): boolean {
+        if (route === '*') return true;
+        if (route.endsWith('*')) {
+            const prefix = route.slice(0, -1);
+            return pathname.startsWith(prefix);
+        }
+        if (route === pathname) return true;
+        return pathname.startsWith(route + '/');
+    }
+
+    static isApiRoute(pathname: string): boolean {
+        return ROUTE_PATTERNS.API.test(pathname);
+    }
+
+    static isPageRoute(pathname: string): boolean {
+        return !this.isApiRoute(pathname);
+    }
+
+    static getRouteType(pathname: string): string {
+        return this.isApiRoute(pathname) ? RouteType.API : RouteType.PAGE;
+    }
+
+    static isPublicRoute(pathname: string): boolean {
+        return PUBLIC_ROUTES.some(route => this.matchesRoute(pathname, route)) ||
+            PUBLIC_API_ROUTES.some(route => this.matchesRoute(pathname, route)) ||
+            ROUTE_PATTERNS.STATIC.test(pathname) ||
+            ROUTE_PATTERNS.NEXT_INTERNAL.test(pathname);
+    }
+
+    static isRouteProtected(pathname: string): boolean {
+        if (this.isPublicRoute(pathname)) {
+            return false;
+        }
+        if (this.isApiRoute(pathname)) {
+            return true;
+        }
+        return PROTECTED_ROUTES.some(route => this.matchesRoute(pathname, route));
+    }
+
+    static getCurrentUserId(request: NextRequest): string | null {
         return request.headers.get(UserHeaders.USER_ID);
-    },
+    }
 
-    /**
-     * Get current tenant ID from request headers
-     */
-    getCurrentTenantId(request: NextRequest): string | null {
+    static getCurrentTenantId(request: NextRequest): string | null {
         return request.headers.get(UserHeaders.TENANT_ID);
-    },
+    }
 
-    /**
-     * Get current user email from request headers
-     */
-    getCurrentUserEmail(request: NextRequest): string | null {
+    static getCurrentUserEmail(request: NextRequest): string | null {
         return request.headers.get(UserHeaders.USER_EMAIL);
-    },
+    }
 
-    /**
-     * Get all user context from request headers
-     */
-    getAllUserContext(request: NextRequest): {
-        userId: string | null;
-        email: string | null;
-        tenantId: string | null;
-    } {
+    static isAuthenticated(request: NextRequest): boolean {
+        return this.getCurrentUserId(request) !== null;
+    }
+
+    static hasTenantContext(request: NextRequest): boolean {
+        return this.getCurrentTenantId(request) !== null;
+    }
+
+    static hasUserContext(request: NextRequest): boolean {
+        return !!(this.getCurrentUserId(request) && this.getCurrentUserEmail(request));
+    }
+
+    static getUserContext(request: NextRequest) {
+        return {
+            userId: this.getCurrentUserId(request),
+            userEmail: this.getCurrentUserEmail(request),
+            tenantId: this.getCurrentTenantId(request),
+            isAuthenticated: this.isAuthenticated(request),
+            hasTenantContext: this.hasTenantContext(request)
+        };
+    }
+
+    static getAllUserContext(request: NextRequest) {
         return {
             userId: this.getCurrentUserId(request),
             email: this.getCurrentUserEmail(request),
             tenantId: this.getCurrentTenantId(request),
         };
-    },
-
-    /**
-     * Check if user context is available in request headers
-     */
-    hasUserContext(request: NextRequest): boolean {
-        return !!(this.getCurrentUserId(request) && this.getCurrentUserEmail(request));
     }
-};
+}
 
-// Re-export types and utilities for convenience
-export { RouteType, UserHeaders } from './config';
-export { isRouteProtected, getRouteType } from './route-matcher';
-export { getCurrentUser, isUserAuthenticated } from './auth-utils';
+export const {
+    isAuthenticated,
+    getCurrentUserId,
+    getCurrentTenantId,
+    getCurrentUserEmail,
+    hasTenantContext,
+    hasUserContext,
+    getUserContext,
+    getAllUserContext,
+    isApiRoute,
+    isPageRoute,
+    isPublicRoute,
+    isRouteProtected,
+    getRouteType
+} = MiddlewareService;

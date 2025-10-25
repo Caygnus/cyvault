@@ -1,5 +1,5 @@
 import { headers } from 'next/headers';
-import { getUserContext } from '@/core/middleware/helpers';
+import { MiddlewareService } from '@/core/middleware/middleware';
 
 export default async function DashboardPage() {
     let userContext;
@@ -7,7 +7,7 @@ export default async function DashboardPage() {
     try {
         // Get user context from headers (set by middleware)
         const headersList = await headers();
-        userContext = getUserContext({ headers: headersList } as any);
+        userContext = MiddlewareService.getUserContext({ headers: headersList } as any);
     } catch (error) {
         console.error('Dashboard error:', error);
         userContext = { isAuthenticated: false };

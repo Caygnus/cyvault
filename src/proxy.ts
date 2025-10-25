@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { AuthMiddleware } from '@/core/middleware/middleware';
+import { MiddlewareService } from '@/core/middleware/middleware';
 
 export default async function proxy(request: NextRequest) {
-    return await AuthMiddleware(request);
+    return await MiddlewareService.handleRequest(request);
 }
 
 // Configure which routes this middleware should run on

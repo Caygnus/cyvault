@@ -1,37 +1,32 @@
 /**
- * Middleware module exports
- * This file provides a clean API for importing middleware functionality
+ * Unified Middleware Service
+ * Single interface for all middleware functionality
  */
 
-// Main middleware function
-export { AuthMiddleware } from './middleware';
+// Main service class with all methods
+export { MiddlewareService } from './middleware';
 
-// Configuration and types
-export { RouteType, UserHeaders, PROTECTED_ROUTES, PUBLIC_API_ROUTES, PUBLIC_ROUTES } from './config';
-
-// Route matching utilities
+// Individual method exports for convenience
 export {
-    isRouteProtected,
-    getRouteType,
+    isAuthenticated,
+    getCurrentUserId,
+    getCurrentTenantId,
+    getCurrentUserEmail,
+    hasTenantContext,
+    hasUserContext,
+    getUserContext,
+    getAllUserContext,
     isApiRoute,
     isPageRoute,
-    isPublicRoute
-} from './route-matcher';
-
-// Authentication utilities
-export {
-    getCurrentUser,
-    isUserAuthenticated,
-    setUserContext,
-    createUnauthorizedResponse,
-    createRedirectResponse
-} from './auth-utils';
-
-// User context helpers
-export { UserContext } from './middleware';
-
-// Logger (for debugging)
-export { logger } from './logger';
+    isPublicRoute,
+    isRouteProtected,
+    getRouteType,
+    UserHeaders,
+    RouteType,
+    PROTECTED_ROUTES,
+    PUBLIC_API_ROUTES,
+    PUBLIC_ROUTES
+} from './middleware';
 
 // Re-export types from Supabase
 export type { User, Session } from '@supabase/supabase-js';
