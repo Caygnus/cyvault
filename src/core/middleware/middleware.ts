@@ -41,8 +41,7 @@ export async function AuthMiddleware(request: NextRequest): Promise<NextResponse
 
         // 4. User is authenticated - set context and proceed
         logger.info(`User authenticated: ${user!.id}`);
-        setUserContext(request, user!);
-        return response;
+        return setUserContext(request, user!);
 
     } catch (error) {
         logger.error(error as string);

@@ -82,9 +82,17 @@ export function getCurrentTenantId(user: User | null): string | null {
 /**
  * Set user context in request headers
  */
-export function setUserContext(request: NextRequest, user: User): void {
-    if (!user) return;
+export function setUserContext(request: NextRequest, user: User): NextResponse {
+    if (!user) return NextResponse.next();
 
+    // Create a response that forwards the request with user headers
+    const response = NextResponse.next({
+        request: {
+            headers: request.headers,
+        },
+    });
+
+    // Set user context in the forwarded request headers
     request.headers.set(UserHeaders.USER_ID, user.id || '');
     request.headers.set(UserHeaders.USER_EMAIL, user.email || '');
 
@@ -92,6 +100,15 @@ export function setUserContext(request: NextRequest, user: User): void {
     if (tenantId) {
         request.headers.set(UserHeaders.TENANT_ID, tenantId);
     }
+
+    // Also set the headers in the response so they're available in API routes
+    response.headers.set(UserHeaders.USER_ID, user.id || '');
+    response.headers.set(UserHeaders.USER_EMAIL, user.email || '');
+    if (tenantId) {
+        response.headers.set(UserHeaders.TENANT_ID, tenantId);
+    }
+
+    return response;
 }
 
 /**
