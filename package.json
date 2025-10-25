@@ -2,6 +2,7 @@
   "name": "cyvault",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -12,7 +13,9 @@
     "db:migrate": "npx drizzle-kit migrate",
     "db:pull": "npx drizzle-kit pull",
     "db:export": "npx drizzle-kit export",
-    "db:update": "npm run db:generate && npm run db:migrate"
+    "db:update": "npm run db:generate && npm run db:migrate",
+    "db:safe-migrate": "node scripts/safe-migrate.js",
+    "db:rollback": "node scripts/rollback.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
