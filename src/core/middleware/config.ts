@@ -31,13 +31,11 @@ export const PROTECTED_ROUTES = [
 ] as const;
 
 /**
- * Protected API routes that require authentication
+ * Public API routes that don't require authentication
  */
-export const PROTECTED_API_ROUTES = [
-    '/api/protected',
-    '/api/user',
-    '/api/admin',
-    '/api/test'
+export const PUBLIC_API_ROUTES = [
+    '/api/auth',
+    '/api/health',
 ] as const;
 
 /**
@@ -49,8 +47,7 @@ export const PUBLIC_ROUTES = [
     '/forgot-password',
     '/reset-password',
     '/_next',
-    '/favicon.ico',
-    '/api/auth'
+    '/favicon.ico'
 ] as const;
 
 /**

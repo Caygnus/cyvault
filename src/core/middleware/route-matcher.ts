@@ -1,4 +1,4 @@
-import { RouteType, PROTECTED_ROUTES, PROTECTED_API_ROUTES, PUBLIC_ROUTES, ROUTE_PATTERNS } from './config';
+import { RouteType, PROTECTED_ROUTES, PUBLIC_API_ROUTES, PUBLIC_ROUTES, ROUTE_PATTERNS } from './config';
 
 /**
  * Route matching utilities for middleware
@@ -48,6 +48,7 @@ export function getRouteType(pathname: string): RouteType {
  */
 export function isPublicRoute(pathname: string): boolean {
     return PUBLIC_ROUTES.some(route => matchesRoute(pathname, route)) ||
+        PUBLIC_API_ROUTES.some(route => matchesRoute(pathname, route)) ||
         ROUTE_PATTERNS.STATIC.test(pathname) ||
         ROUTE_PATTERNS.NEXT_INTERNAL.test(pathname);
 }
@@ -61,7 +62,11 @@ export function isRouteProtected(pathname: string): boolean {
         return false;
     }
 
-    // Check protected routes
-    return PROTECTED_ROUTES.some(route => matchesRoute(pathname, route)) ||
-        PROTECTED_API_ROUTES.some(route => matchesRoute(pathname, route));
+    // For API routes: require authentication by default (unless in PUBLIC_API_ROUTES)
+    if (isApiRoute(pathname)) {
+        return true;
+    }
+
+    // For page routes: check if it's in protected routes
+    return PROTECTED_ROUTES.some(route => matchesRoute(pathname, route));
 }

@@ -7,7 +7,7 @@
 export { AuthMiddleware } from './middleware';
 
 // Configuration and types
-export { RouteType, UserHeaders, PROTECTED_ROUTES, PROTECTED_API_ROUTES, PUBLIC_ROUTES } from './config';
+export { RouteType, UserHeaders, PROTECTED_ROUTES, PUBLIC_API_ROUTES, PUBLIC_ROUTES } from './config';
 
 // Route matching utilities
 export {
