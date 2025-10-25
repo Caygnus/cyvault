@@ -1,212 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import type { User } from '@supabase/supabase-js';
+
+// Import optimized modules
+import { RouteType, UserHeaders } from './config';
+import { isRouteProtected, getRouteType } from './route-matcher';
+import {
+    getCurrentUser,
+    setUserContext,
+    createUnauthorizedResponse,
+    createRedirectResponse,
+    isUserAuthenticated
+} from './auth-utils';
+import { logger } from './logger';
 
 /**
- * Route types for authentication
- */
-export enum RouteType {
-    PAGE = 'page',
-    API = 'api'
-}
-
-/**
- * Authentication status
- */
-export enum AuthStatus {
-    AUTHENTICATED = 'authenticated',
-    UNAUTHENTICATED = 'unauthenticated'
-}
-
-/**
- * Response headers for user context
- */
-export enum UserHeaders {
-    USER_ID = 'x-user-id',
-    USER_EMAIL = 'x-user-email',
-    TENANT_ID = 'x-tenant-id'
-}
-
-/**
- * Protected routes that require authentication
- */
-const PROTECTED_ROUTES = [
-    '/dashboard',
-    '/profile',
-    '/settings',
-    '/admin'
-];
-
-/**
- * Protected API routes that require authentication
- */
-const PROTECTED_API_ROUTES = [
-    '/api/protected',
-    '/api/user',
-    '/api/admin',
-    '/api/test'
-];
-
-/**
- * Check if a route requires authentication
- */
-function isRouteProtected(pathname: string): boolean {
-    return PROTECTED_ROUTES.some(route => matchesRoute(pathname, route)) ||
-        PROTECTED_API_ROUTES.some(route => matchesRoute(pathname, route));
-}
-
-/**
- * Check if a pathname matches a route pattern (supports wildcards)
- */
-function matchesRoute(pathname: string, route: string): boolean {
-    // Handle wildcard patterns
-    if (route === '*') return true;
-    if (route.endsWith('*')) {
-        const prefix = route.slice(0, -1);
-        return pathname.startsWith(prefix);
-    }
-
-    // Handle exact matches
-    if (route === pathname) return true;
-
-    // Handle prefix matches (e.g., '/dashboard' matches '/dashboard/settings')
-    return pathname.startsWith(route + '/');
-}
-
-/**
- * Check if request is for an API route
- */
-function isApiRoute(pathname: string): boolean {
-    return pathname.startsWith('/api/');
-}
-
-/**
- * Check if request is for a page route
- */
-function isPageRoute(pathname: string): boolean {
-    return !isApiRoute(pathname);
-}
-
-/**
- * Get user from Supabase session
- */
-async function getCurrentUser(request: NextRequest) {
-    try {
-        console.log('🔧 Creating Supabase client...');
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            {
-                cookies: {
-                    get(name: string) {
-                        return request.cookies.get(name)?.value;
-                    },
-                    set() {
-                        // No-op for middleware
-                    },
-                    remove() {
-                        // No-op for middleware
-                    },
-                },
-            }
-        );
-
-        console.log('🔍 Getting user from Supabase...');
-        const { data: { user }, error } = await supabase.auth.getUser();
-
-        if (error) {
-            console.error('❌ Supabase auth error:', error);
-            return null;
-        }
-
-        console.log('👤 User data:', user ? { id: user.id, email: user.email } : 'null');
-        return user;
-    } catch (error) {
-        console.error('❌ Error in getCurrentUser:', error);
-        return null;
-    }
-}
-
-/**
- * Extract tenant ID from user metadata
- */
-function getCurrentTenantId(user: User | null): string | null {
-    if (!user) return null;
-    const userMetadata = user.user_metadata || {};
-    const appMetadata = user.app_metadata || {};
-    return userMetadata.tenant_id || appMetadata.tenant_id || null;
-}
-
-/**
- * Set user context in request headers
- */
-function setUserContext(request: NextRequest, user: User): void {
-    if (!user) return;
-
-    request.headers.set(UserHeaders.USER_ID, user.id || '');
-    request.headers.set(UserHeaders.USER_EMAIL, user.email || '');
-
-    const tenantId = getCurrentTenantId(user);
-    if (tenantId) {
-        request.headers.set(UserHeaders.TENANT_ID, tenantId);
-    }
-}
-
-/**
- * Authentication middleware
+ * Authentication middleware - Optimized version
  */
 export async function AuthMiddleware(request: NextRequest): Promise<NextResponse> {
-    try {
-        const pathname = request.nextUrl.pathname;
-        console.log('🔍 Processing route:', pathname);
+    const pathname = request.nextUrl.pathname;
 
-        // 1. Check if route needs authentication
+    logger.info(pathname);
+
+    try {
+        // 1. Early return for non-protected routes
         if (!isRouteProtected(pathname)) {
-            console.log('✅ Route is not protected:', pathname);
+            logger.info(pathname);
             return NextResponse.next();
         }
 
-        console.log('🔒 Route is protected:', pathname);
+        logger.info(pathname);
 
-        // 2. Get current user
-        const user = await getCurrentUser(request);
-        console.log('👤 User found:', user ? 'Yes' : 'No');
+        // 2. Get current user with optimized error handling
+        const { user, response } = await getCurrentUser(request);
+        logger.info(`User found: ${user ? user.id : 'not found'}`);
 
-        // 3. Check if user is authenticated
-        if (!user || !user.id) {
-            console.log('❌ User not authenticated, redirecting to login');
-            // 4. Check if request is for page or API
-            if (isPageRoute(pathname)) {
-                // 5. Redirect to login page
-                const loginUrl = new URL('/login', request.url);
-                loginUrl.searchParams.set('redirect', pathname);
-                console.log('🔄 Redirecting to:', loginUrl.toString());
-                return NextResponse.redirect(loginUrl);
-            } else {
-                // 6. Return 401 for API
-                console.log('🚫 Returning 401 for API');
-                return new NextResponse(
-                    JSON.stringify({ error: 'Unauthorized' }),
-                    {
-                        status: 401,
-                        headers: { 'Content-Type': 'application/json' }
-                    }
-                );
-            }
+        // 3. Check authentication status
+        if (!isUserAuthenticated(user)) {
+            logger.info('User not authenticated');
+            return handleUnauthenticatedRequest(request, pathname);
         }
 
-        // 7. Allow request and attach user context to request
-        console.log('✅ User authenticated, setting context');
-        setUserContext(request, user);
-        return NextResponse.next();
+        // 4. User is authenticated - set context and proceed
+        logger.info(`User authenticated: ${user!.id}`);
+        setUserContext(request, user!);
+        return response;
+
     } catch (error) {
-        console.error('❌ Middleware error:', error);
+        logger.error(error as string);
         return NextResponse.next();
     }
 }
 
 /**
- * Helper methods for getting user context
+ * Handle unauthenticated requests based on route type
+ */
+function handleUnauthenticatedRequest(request: NextRequest, pathname: string): NextResponse {
+    const routeType = getRouteType(pathname);
+
+    if (routeType === RouteType.PAGE) {
+        logger.info('Redirecting to login');
+        return createRedirectResponse(request, pathname);
+    } else {
+        logger.info('Returning unauthorized');
+        return createUnauthorizedResponse();
+    }
+}
+
+/**
+ * Helper methods for getting user context from request headers
+ * These methods can be used in API routes and Server Components
  */
 export const UserContext = {
     /**
@@ -228,5 +89,32 @@ export const UserContext = {
      */
     getCurrentUserEmail(request: NextRequest): string | null {
         return request.headers.get(UserHeaders.USER_EMAIL);
+    },
+
+    /**
+     * Get all user context from request headers
+     */
+    getAllUserContext(request: NextRequest): {
+        userId: string | null;
+        email: string | null;
+        tenantId: string | null;
+    } {
+        return {
+            userId: this.getCurrentUserId(request),
+            email: this.getCurrentUserEmail(request),
+            tenantId: this.getCurrentTenantId(request),
+        };
+    },
+
+    /**
+     * Check if user context is available in request headers
+     */
+    hasUserContext(request: NextRequest): boolean {
+        return !!(this.getCurrentUserId(request) && this.getCurrentUserEmail(request));
     }
 };
+
+// Re-export types and utilities for convenience
+export { RouteType, UserHeaders } from './config';
+export { isRouteProtected, getRouteType } from './route-matcher';
+export { getCurrentUser, isUserAuthenticated } from './auth-utils';

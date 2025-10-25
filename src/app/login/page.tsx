@@ -3,10 +3,9 @@
 import * as React from "react"
 import { ChevronLeft, Github, Twitter } from "lucide-react"
 import { motion } from "framer-motion"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/core/supabase/client"
-import { useState } from "react"
-import { div } from "framer-motion/client"
+import { useEffect, useState } from "react"
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState("")
@@ -14,6 +13,18 @@ const LoginPage: React.FC = () => {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const redirectTo = searchParams.get('redirect') || '/'
+
+    useEffect(() => {
+        const checkUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+                router.replace(redirectTo)
+            }
+        }
+        checkUser()
+    }, [redirectTo, router])
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -29,7 +40,7 @@ const LoginPage: React.FC = () => {
             if (error) {
                 setError(error.message)
             } else if (data.user) {
-                router.push("/dashboard")
+                router.push(redirectTo)
             }
         } catch (err) {
             setError("An unexpected error occurred")
