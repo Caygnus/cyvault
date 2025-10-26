@@ -19,7 +19,7 @@ export class AuthServiceImpl implements AuthService {
         const { data: { user: supabaseUser }, error: supabaseError } = await supabase.auth.getUser(request.token);
         if (supabaseError) throw supabaseError;
 
-        user = user.with({ id: supabaseUser?.id ?? "" });
+        user = user.with({ id: supabaseUser?.id });
 
         const { data, error } = await this.params.userRepository.create(user);
         if (error) throw error;
