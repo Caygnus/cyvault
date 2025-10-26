@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { User } from '@supabase/supabase-js';
+import RequestContext, { RequestContextStore } from '@/core/context/context';
+import {
+    toErrorResponse,
+    toAppError,
+    getStatusCode,
+    logError,
+    ErrorCode
+} from '@/types';
 
 export enum UserHeaders {
     USER_ID = 'x-user-id',
@@ -12,7 +20,6 @@ export enum RouteType {
     PAGE = 'page',
     API = 'api'
 }
-
 
 export const PUBLIC_API_ROUTES = [
     '/api/health',
@@ -27,7 +34,6 @@ export const PUBLIC_ROUTES = [
     '/favicon.ico',
     '/robots.txt',
     '/sitemap.xml',
-    '/robots.txt',
 ] as const;
 
 const ROUTE_PATTERNS = {
@@ -41,6 +47,10 @@ type CookieData = {
     value: string;
     options?: Record<string, unknown>;
 };
+
+export type RouteHandler<T = unknown> = (req: NextRequest, ...args: unknown[]) => Promise<T>;
+
+export type ApiRouteHandler<T = unknown> = (req: NextRequest, context?: { params: unknown }) => Promise<T>;
 
 export class MiddlewareService {
     static async handleRequest(request: NextRequest): Promise<NextResponse> {
@@ -132,7 +142,30 @@ export class MiddlewareService {
             response.headers.set(UserHeaders.TENANT_ID, tenantId);
         }
 
+        this.initializeRequestContext(request, user, tenantId);
+
         return response;
+    }
+
+    private static initializeRequestContext(request: NextRequest, user: User, tenantId: string | null): void {
+        try {
+            const contextStore: RequestContextStore = {
+                requestId: crypto.randomUUID(),
+                requestPath: request.nextUrl.pathname,
+                requestMethod: request.method,
+                requestStartTime: Date.now(),
+                [UserHeaders.USER_ID]: user.id,
+                [UserHeaders.USER_EMAIL]: user.email || '',
+            };
+
+            if (tenantId) {
+                contextStore[UserHeaders.TENANT_ID] = tenantId;
+            }
+
+            RequestContext.run(contextStore, () => { });
+        } catch (error) {
+            console.error('Failed to initialize RequestContext:', error);
+        }
     }
 
     private static handleUnauthenticatedRequest(request: NextRequest, pathname: string): NextResponse {
@@ -201,13 +234,7 @@ export class MiddlewareService {
     }
 
     static isRouteProtected(pathname: string): boolean {
-        // If it's a public route, it's not protected
-        if (this.isPublicRoute(pathname)) {
-            return false;
-        }
-
-        // All other routes are protected by default
-        return true;
+        return !this.isPublicRoute(pathname);
     }
 
     static getCurrentUserId(request: NextRequest): string | null {
@@ -251,6 +278,63 @@ export class MiddlewareService {
             tenantId: this.getCurrentTenantId(request),
         };
     }
+
+    static handleError(error: unknown, req: NextRequest): NextResponse {
+        const appError = toAppError(error);
+        const errorResponse = toErrorResponse(appError);
+        const statusCode = getStatusCode(appError);
+
+        const isValidationError = appError.code === ErrorCode.VALIDATION_ERROR;
+        const isNotFoundError = appError.code === ErrorCode.NOT_FOUND;
+
+        if (!isValidationError && !isNotFoundError) {
+            logError(appError, `${req.nextUrl.pathname} [${req.method}] [User: ${RequestContext.tryGetUserId() || 'anonymous'}]`);
+        }
+
+        return NextResponse.json(errorResponse, { status: statusCode });
+    }
+
+    static withHandler<T = unknown>(
+        handler: RouteHandler<T>
+    ): (req: NextRequest, ...args: unknown[]) => Promise<NextResponse> {
+        return async (req: NextRequest, ...args: unknown[]): Promise<NextResponse> => {
+            try {
+                const result = await handler(req, ...args);
+
+                if (result instanceof NextResponse) {
+                    return result;
+                }
+
+                return NextResponse.json({
+                    success: true,
+                    data: result
+                });
+            } catch (error) {
+                return this.handleError(error, req);
+            }
+        };
+    }
+
+    static withApiHandler<T = unknown>(
+        handler: ApiRouteHandler<T>
+    ): (req: NextRequest, context?: { params: unknown }) => Promise<NextResponse> {
+        return async (req: NextRequest, context?: { params: unknown }): Promise<NextResponse> => {
+            try {
+                const result = await handler(req, context);
+
+                if (result instanceof NextResponse) {
+                    return result;
+                }
+
+                return NextResponse.json({
+                    success: true,
+                    data: result
+                });
+            } catch (error) {
+                return this.handleError(error, req);
+            }
+        };
+    }
 }
 
 export const {
@@ -266,5 +350,7 @@ export const {
     isPageRoute,
     isPublicRoute,
     isRouteProtected,
-    getRouteType
+    getRouteType,
+    withHandler,
+    withApiHandler
 } = MiddlewareService;

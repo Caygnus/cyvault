@@ -1,13 +1,12 @@
 import { injectable } from "tsyringe";
-import { UserEntity, UserFilter } from "@/domain";
+import { UserFilter } from "@/domain";
 import { RepoParams } from "@/core/di";
-import { EntityStatus } from "@/types";
 import { Err } from "@/types";
-import { 
-    UserRequest, 
-    UserUpdateRequest, 
-    UserResponse, 
-    UserWithTenantResponse 
+import RequestContext from "@/core/context/context";
+import {
+    UserRequest,
+    UserUpdateRequest,
+    UserResponse
 } from "@/domain";
 
 // Service interface
@@ -19,6 +18,10 @@ export interface UserService {
     updateUser(id: string, request: UserUpdateRequest): Promise<UserResponse>;
     deleteUser(id: string): Promise<void>;
     getUsersByIds(ids: string[]): Promise<UserResponse[]>;
+
+    // New methods that use context
+    getCurrentUser(): Promise<UserResponse | null>;
+    updateCurrentUser(request: UserUpdateRequest): Promise<UserResponse>;
 }
 
 // Implementation
@@ -40,7 +43,7 @@ export class UserServiceImpl implements UserService {
 
     async createUser(request: UserRequest): Promise<UserResponse> {
         request.validate();
-        
+
         const existingUser = await this.getUserByEmail(request.email);
         if (existingUser) {
             throw Err.validation(`User with email ${request.email} already exists`)
@@ -62,7 +65,7 @@ export class UserServiceImpl implements UserService {
 
     async updateUser(id: string, request: UserUpdateRequest): Promise<UserResponse> {
         request.validate();
-        
+
         const existingUser = await this.getUserById(id);
         if (!existingUser) {
             throw Err.notFound(`User with ID ${id} not found`);
@@ -94,5 +97,32 @@ export class UserServiceImpl implements UserService {
         const { data, error } = await this.params.userRepository.findByIds(ids);
         if (error) throw error;
         return data.map(UserResponse.fromDomain);
+    }
+
+    /**
+     * Get the current user from the request context
+     * @returns The current user or null if not authenticated
+     */
+    async getCurrentUser(): Promise<UserResponse | null> {
+        const userId = RequestContext.getUserId();
+        if (!userId) {
+            throw Err.unauthorized('No authenticated user found in context');
+        }
+
+        return this.getUserById(userId);
+    }
+
+    /**
+     * Update the current user from the request context
+     * @param request Update request data
+     * @returns The updated user
+     */
+    async updateCurrentUser(request: UserUpdateRequest): Promise<UserResponse> {
+        const userId = RequestContext.getUserId();
+        if (!userId) {
+            throw Err.unauthorized('No authenticated user found in context');
+        }
+
+        return this.updateUser(userId, request);
     }
 }
