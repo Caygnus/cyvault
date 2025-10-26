@@ -26,7 +26,7 @@ export class AuthServiceImpl implements AuthService {
 
         // onboard the user with tenant 
         const onboardingService = new OnboardingServiceImpl(this.params);
-        await onboardingService.onboardUserWithTenant(request, user);
+        await onboardingService.onboardUser(request, user);
 
         return new SignupResponse(data.id, data.email);
     }

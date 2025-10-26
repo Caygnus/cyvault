@@ -1,6 +1,7 @@
 import { Tenant as TenantDB } from '@/core/db/schema';
 import { EntityStatus } from '@/types';
 import { BaseEntity } from './base';
+import { generateUUIDWithPrefix, UUID_PREFIX } from '@/core/utils/uuid';
 
 export class TenantEntity extends BaseEntity {
     constructor(
@@ -84,6 +85,19 @@ export class TenantEntity extends BaseEntity {
             updates.updatedAt ?? this.updatedAt,
             updates.createdBy ?? this.createdBy,
             updates.updatedBy ?? this.updatedBy,
+        );
+    }
+
+    static create(tenant: Partial<TenantEntity>): TenantEntity {
+        return new TenantEntity(
+            tenant.id ?? generateUUIDWithPrefix(UUID_PREFIX.TENANT),
+            tenant.name ?? "",
+            tenant.description ?? null,
+            tenant.status ?? EntityStatus.PUBLISHED,
+            tenant.createdAt ?? new Date(),
+            tenant.updatedAt ?? new Date(),
+            tenant.createdBy ?? null,
+            tenant.updatedBy ?? null,
         );
     }
 }
