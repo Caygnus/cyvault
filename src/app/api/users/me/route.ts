@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { NextRequest } from "next/server";
 import { withApiHandler } from "@/core/middleware";
 import { ensureBootstrap, getRepoParams } from "@/core/di";
