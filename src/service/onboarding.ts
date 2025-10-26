@@ -1,5 +1,6 @@
 import { RepoParams } from "@/core/di";
 import { SignupRequest, TenantRequest, UserEntity } from "@/domain";
+import { createClient } from "@/core/supabase/server";
 
 interface OnboardingService {
     onboardUser(request: SignupRequest, user: UserEntity): Promise<void>;
@@ -8,11 +9,28 @@ interface OnboardingService {
 export class OnboardingServiceImpl implements OnboardingService {
     constructor(private readonly params: RepoParams) { }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async onboardUser(request: SignupRequest, user: UserEntity): Promise<void> {
         const tenantRequest = new TenantRequest(request.tenantName ?? "", "");
         const tenant = tenantRequest.toDomain();
-        console.log('tenant', tenant);
 
+        const { data: tenantData, error: tenantError } = await this.params.tenantRepository.create(tenant);
+        if (tenantError) throw tenantError;
+
+        // Update the Supabase user with the tenant id using Admin API
+        const supabase = await createClient();
+        const { error: err } = await supabase.auth.admin.updateUserById(user.id, {
+            user_metadata: {
+                tenant_id: tenantData.id
+            }
+        });
+        if (err) throw err;
+
+        // Also update the user entity in our database with tenant_id
+        const updatedUser = user.with({
+            updatedAt: new Date(),
+        });
+
+        const { error: userUpdateError } = await this.params.userRepository.update(updatedUser);
+        if (userUpdateError) throw userUpdateError;
     }
 }
