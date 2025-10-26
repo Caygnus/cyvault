@@ -5,6 +5,7 @@ import { BaseEntity } from './base';
 
 export interface UserEntityParams {
     id?: string;
+    tenantId?: string;
     name: string;
     email: string;
     avatarUrl?: string | null;
@@ -18,6 +19,7 @@ export interface UserEntityParams {
 export class UserEntity extends BaseEntity {
     constructor(
         id: string, // Supabase UUID
+        public readonly tenantId: string,
         public readonly name: string,
         public readonly email: string,
         public readonly avatarUrl: string | null,
@@ -33,6 +35,7 @@ export class UserEntity extends BaseEntity {
     static fromDB(user: UserDB): UserEntity {
         return new UserEntity(
             user.id,
+            user.tenantId,
             user.name,
             user.email,
             user.avatarUrl,
@@ -63,6 +66,7 @@ export class UserEntity extends BaseEntity {
     toUserDB(): UserDB {
         return {
             id: this.id,
+            tenantId: this.tenantId,
             name: this.name,
             email: this.email,
             avatarUrl: this.avatarUrl,
@@ -77,6 +81,7 @@ export class UserEntity extends BaseEntity {
     copyWith(updates: Partial<BaseEntity>): BaseEntity {
         return new UserEntity(
             (updates as Partial<UserEntity>).id ?? this.id,
+            (updates as Partial<UserEntity>).tenantId ?? this.tenantId,
             (updates as Partial<UserEntity>).name ?? this.name,
             (updates as Partial<UserEntity>).email ?? this.email,
             (updates as Partial<UserEntity>).avatarUrl ?? this.avatarUrl,
@@ -94,6 +99,7 @@ export class UserEntity extends BaseEntity {
     with(updates: Partial<UserEntity>): UserEntity {
         return new UserEntity(
             updates.id ?? this.id,
+            updates.tenantId ?? this.tenantId,
             updates.name ?? this.name,
             updates.email ?? this.email,
             updates.avatarUrl ?? this.avatarUrl,
@@ -112,6 +118,7 @@ export class UserEntity extends BaseEntity {
         const now = new Date();
         return new UserEntity(
             params.id ?? generateUUIDWithPrefix(UUID_PREFIX.USER),
+            params.tenantId ?? "",
             params.name,
             params.email,
             params.avatarUrl ?? null,
