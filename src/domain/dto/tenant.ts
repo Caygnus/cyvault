@@ -1,5 +1,5 @@
 import { Err } from "@/types/errors";
-import { BaseRequestDto } from "./base";
+import { BaseRequestDto, BaseResponseDto } from "./base";
 import { TenantEntity } from "../entities";
 
 export class TenantRequest extends BaseRequestDto {
@@ -30,5 +30,26 @@ export class TenantRequest extends BaseRequestDto {
             createdBy: null,
             updatedBy: null,
         });
+    }
+}
+
+export class TenantResponse extends BaseResponseDto {
+    readonly id: string;
+    readonly name: string;
+    readonly description: string;
+
+    constructor(id: string, name: string, description: string) {
+        super();
+        this.id = id;
+        this.name = name;
+        this.description = description;
+    }
+
+    toJson(): Record<string, unknown> {
+        return {
+            id: this.id,
+            name: this.name,
+            description: this.description,
+        };
     }
 }
