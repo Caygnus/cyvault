@@ -1,9 +1,11 @@
+import { injectable } from "tsyringe";
 import { UserFilter } from '@/domain/filters';
 import { users } from '@/core/db/schema';
-import { Database } from '@/core/db/client';
+import type { Database } from '@/core/db/client';
 import { UserEntity } from '@/domain/entities';
 import { eq, and } from 'drizzle-orm';
-import { AppError, Err, withErrorHandling } from '@/types';
+import type { AppError } from '@/types';
+import { Err, withErrorHandling } from '@/types';
 
 // Repository interface following Go pattern with error returns
 export interface UserRepository {
@@ -18,6 +20,7 @@ export interface UserRepository {
 }
 
 // Implementation with proper error handling
+@injectable()
 export class UserRepositoryImpl implements UserRepository {
     constructor(private readonly db: Database) { }
 

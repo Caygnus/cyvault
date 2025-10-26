@@ -9,3 +9,4 @@ const connectionString = process.env.DATABASE_URL as string
 export const client = postgres(connectionString, { prepare: false })
 export const db = drizzle(client);
 export type Database = typeof db;
+export type TransactionDatabase = Parameters<Parameters<typeof db.transaction>[0]>[0];
