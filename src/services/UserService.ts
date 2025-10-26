@@ -3,21 +3,22 @@ import { UserEntity } from "@/domain/entities";
 import { UserFilter } from "@/domain/filters";
 import { RepoParams } from "@/core/di";
 import { EntityStatus } from "@/types";
+import { Err } from "@/types";
 
 @injectable()
 export class UserService {
     constructor(private readonly params: RepoParams) { }
 
     async getUserById(id: string): Promise<UserEntity | null> {
-        const [user, error] = await this.params.userRepository.findById(id);
+        const {data, error} = await this.params.userRepository.findById(id);
         if (error) throw error;
-        return user;
+        return data;
     }
 
     async getUserByEmail(email: string): Promise<UserEntity | null> {
-        const [user, error] = await this.params.userRepository.findByEmail(email);
+        const {data, error} = await this.params.userRepository.findByEmail(email);
         if (error) throw error;
-        return user;
+        return data;
     }
 
     async createUser(userData: {
@@ -43,15 +44,15 @@ export class UserService {
             null
         );
 
-        const [created, error] = await this.params.userRepository.create(user);
+        const {data, error} = await this.params.userRepository.create(user);
         if (error) throw error;
-        return created!;
+        return data;
     }
 
     async listUsers(filter?: UserFilter): Promise<UserEntity[]> {
-        const [users, error] = await this.params.userRepository.findAll(filter);
+        const {data, error} = await this.params.userRepository.findAll(filter);
         if (error) throw error;
-        return users;
+        return data;
     }
 
     async updateUser(
@@ -60,21 +61,22 @@ export class UserService {
     ): Promise<UserEntity> {
         const existingUser = await this.getUserById(id);
         if (!existingUser) {
-            throw new Error(`User with ID ${id} not found`);
+            throw Err.notFound(`User with ID ${id} not found`);
         }
 
-        const updatedUser = existingUser.with({
+        const updatedUser = existingUser!.with({
             ...updates,
             updatedAt: new Date(),
         });
 
-        const [result, error] = await this.params.userRepository.update(updatedUser);
+        const {data, error} = await this.params.userRepository.update(updatedUser);
         if (error) throw error;
-        return result!;
+        return data!;
     }
 
     async deleteUser(id: string): Promise<void> {
-        const [, error] = await this.params.userRepository.delete(id);
+        const {error} = await this.params.userRepository.delete(id);
         if (error) throw error;
+        return undefined;
     }
 }

@@ -9,14 +9,14 @@ import { Err, withErrorHandling } from '@/types';
 
 // Repository interface following Go pattern with error returns
 export interface UserRepository {
-    create(user: UserEntity): Promise<[UserEntity | null, AppError | null]>;
-    findById(id: string): Promise<[UserEntity | null, AppError | null]>;
-    findByEmail(email: string): Promise<[UserEntity | null, AppError | null]>;
-    findAll(filter?: UserFilter): Promise<[UserEntity[], AppError | null]>;
-    count(filter?: UserFilter): Promise<[number, AppError | null]>;
-    update(user: UserEntity): Promise<[UserEntity | null, AppError | null]>;
-    delete(id: string): Promise<[void, AppError | null]>;
-    findByIds(ids: string[]): Promise<[UserEntity[], AppError | null]>;
+    create(user: UserEntity): Promise<{ data: UserEntity, error: AppError | null }>;
+    findById(id: string): Promise<{ data: UserEntity | null, error: AppError | null }>;
+    findByEmail(email: string): Promise<{ data: UserEntity | null, error: AppError | null }>;
+    findAll(filter?: UserFilter): Promise<{ data: UserEntity[], error: AppError | null }>;
+    count(filter?: UserFilter): Promise<{ data: number, error: AppError | null }>;
+    update(user: UserEntity): Promise<{ data: UserEntity, error: AppError | null }>;
+    delete(id: string): Promise<{ data: void, error: AppError | null }>;
+    findByIds(ids: string[]): Promise<{ data: UserEntity[], error: AppError | null }>;
 }
 
 // Implementation with proper error handling
@@ -24,11 +24,11 @@ export interface UserRepository {
 export class UserRepositoryImpl implements UserRepository {
     constructor(private readonly db: Database) { }
 
-    async create(user: UserEntity): Promise<[UserEntity | null, AppError | null]> {
+    async create(user: UserEntity): Promise<{ data: UserEntity, error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
                 const [created] = await this.db.insert(users).values(user.toUserDB()).returning();
-                return [UserEntity.fromDB(created), null] as const;
+                return { data: UserEntity.fromDB(created), error: null };
             } catch (error) {
                 throw Err.database('Failed to create user', error as Error)
                     .withDetails({ userId: user.id, email: user.email })
@@ -37,11 +37,11 @@ export class UserRepositoryImpl implements UserRepository {
         });
     }
 
-    async findById(id: string): Promise<[UserEntity | null, AppError | null]> {
+    async findById(id: string): Promise<{ data: UserEntity | null, error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
                 const [result] = await this.db.select().from(users).where(eq(users.id, id));
-                return [result ? UserEntity.fromDB(result) : null, null] as const;
+                return { data: result ? UserEntity.fromDB(result) : null, error: null };
             } catch (error) {
                 throw Err.database('Failed to find user by ID', error as Error)
                     .withDetails({ userId: id })
@@ -50,11 +50,11 @@ export class UserRepositoryImpl implements UserRepository {
         });
     }
 
-    async findByEmail(email: string): Promise<[UserEntity | null, AppError | null]> {
+    async findByEmail(email: string): Promise<{ data: UserEntity | null, error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
                 const [result] = await this.db.select().from(users).where(eq(users.email, email));
-                return [result ? UserEntity.fromDB(result) : null, null] as const;
+                return { data: result ? UserEntity.fromDB(result) : null, error: null };
             } catch (error) {
                 throw Err.database('Failed to find user by email', error as Error)
                     .withDetails({ email })
@@ -63,7 +63,7 @@ export class UserRepositoryImpl implements UserRepository {
         });
     }
 
-    async findAll(filter: UserFilter = UserFilter.createDefault()): Promise<[UserEntity[], AppError | null]> {
+    async findAll(filter: UserFilter = UserFilter.createDefault()): Promise<{ data: UserEntity[], error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
                 filter.validate();
@@ -75,7 +75,7 @@ export class UserRepositoryImpl implements UserRepository {
                 query = filter.applyToQuery(query, users);
 
                 const results = await query;
-                return [results.map(UserEntity.fromDB), null] as const;
+                return { data: results.map(UserEntity.fromDB), error: null };
             } catch (error) {
                 throw Err.database('Failed to find all users', error as Error)
                     .withDetails({ filter: JSON.stringify(filter) })
@@ -84,7 +84,7 @@ export class UserRepositoryImpl implements UserRepository {
         });
     }
 
-    async count(filter: UserFilter = UserFilter.createDefault()): Promise<[number, AppError | null]> {
+    async count(filter: UserFilter = UserFilter.createDefault()): Promise<{ data: number, error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
                 filter.validate();
@@ -99,7 +99,7 @@ export class UserRepositoryImpl implements UserRepository {
                 }
 
                 const result = await query;
-                return [result.length, null] as const;
+                return { data: result.length, error: null };
             } catch (error) {
                 throw Err.database('Failed to count users', error as Error)
                     .withDetails({ filter: JSON.stringify(filter) })
@@ -108,14 +108,14 @@ export class UserRepositoryImpl implements UserRepository {
         });
     }
 
-    async update(user: UserEntity): Promise<[UserEntity | null, AppError | null]> {
+    async update(user: UserEntity): Promise<{ data: UserEntity, error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
                 const [updated] = await this.db.update(users)
                     .set(user.toUserDB())
                     .where(eq(users.id, user.id))
                     .returning();
-                return [UserEntity.fromDB(updated), null] as const;
+                return { data: UserEntity.fromDB(updated), error: null };
             } catch (error) {
                 throw Err.database('Failed to update user', error as Error)
                     .withDetails({ userId: user.id })
@@ -124,13 +124,13 @@ export class UserRepositoryImpl implements UserRepository {
         });
     }
 
-    async delete(id: string): Promise<[void, AppError | null]> {
+    async delete(id: string): Promise<{ data: void, error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
                 await this.db.update(users)
                     .set({ status: 'deleted' })
                     .where(eq(users.id, id));
-                return [undefined, null] as const;
+                return { data: undefined, error: null };
             } catch (error) {
                 throw Err.database('Failed to delete user', error as Error)
                     .withDetails({ userId: id })
@@ -139,14 +139,14 @@ export class UserRepositoryImpl implements UserRepository {
         });
     }
 
-    async findByIds(ids: string[]): Promise<[UserEntity[], AppError | null]> {
+    async findByIds(ids: string[]): Promise<{ data: UserEntity[], error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
-                if (ids.length === 0) return [[], null] as const;
+                if (ids.length === 0) return { data: [], error: null };
 
                 const { inArray } = await import('drizzle-orm');
                 const results = await this.db.select().from(users).where(inArray(users.id, ids));
-                return [results.map(UserEntity.fromDB), null] as const;
+                return { data: results.map(UserEntity.fromDB), error: null };
             } catch (error) {
                 throw Err.database('Failed to find users by IDs', error as Error)
                     .withDetails({ userIds: ids })
@@ -172,49 +172,49 @@ export class UserRepositoryFilterImpl implements UserRepositoryFilter {
     constructor(private readonly db: Database) { }
 
     async create(user: UserEntity): Promise<UserEntity> {
-        const [result, error] = await new UserRepositoryImpl(this.db).create(user);
+        const { data, error } = await new UserRepositoryImpl(this.db).create(user);
         if (error) throw error;
-        return result!;
+        return data;
     }
 
     async findById(id: string): Promise<UserEntity | null> {
-        const [result, error] = await new UserRepositoryImpl(this.db).findById(id);
+        const { data, error } = await new UserRepositoryImpl(this.db).findById(id);
         if (error) throw error;
-        return result;
+        return data;
     }
 
     async findByEmail(email: string): Promise<UserEntity | null> {
-        const [result, error] = await new UserRepositoryImpl(this.db).findByEmail(email);
+        const { data, error } = await new UserRepositoryImpl(this.db).findByEmail(email);
         if (error) throw error;
-        return result;
+        return data;
     }
 
     async findAll(filter: UserFilter = UserFilter.createDefault()): Promise<UserEntity[]> {
-        const [result, error] = await new UserRepositoryImpl(this.db).findAll(filter);
+        const { data, error } = await new UserRepositoryImpl(this.db).findAll(filter);
         if (error) throw error;
-        return result;
+        return data;
     }
 
     async count(filter: UserFilter = UserFilter.createDefault()): Promise<number> {
-        const [result, error] = await new UserRepositoryImpl(this.db).count(filter);
+        const { data, error } = await new UserRepositoryImpl(this.db).count(filter);
         if (error) throw error;
-        return result;
+        return data;
     }
 
     async update(user: UserEntity): Promise<UserEntity> {
-        const [result, error] = await new UserRepositoryImpl(this.db).update(user);
+        const { data, error } = await new UserRepositoryImpl(this.db).update(user);
         if (error) throw error;
-        return result!;
+        return data;
     }
 
     async delete(id: string): Promise<void> {
-        const [, error] = await new UserRepositoryImpl(this.db).delete(id);
+        const { error } = await new UserRepositoryImpl(this.db).delete(id);
         if (error) throw error;
     }
 
     async findByIds(ids: string[]): Promise<UserEntity[]> {
-        const [result, error] = await new UserRepositoryImpl(this.db).findByIds(ids);
+        const { data, error } = await new UserRepositoryImpl(this.db).findByIds(ids);
         if (error) throw error;
-        return result;
+        return data;
     }
 }
