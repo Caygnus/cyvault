@@ -28,6 +28,9 @@ export class OnboardingServiceImpl implements OnboardingService {
         // Also update the user entity in our database with tenant_id
         const updatedUser = user.with({
             updatedAt: new Date(),
+            updatedBy: user.id,
+            createdBy: user.id,
+            tenantId: tenantData.id,
         });
 
         const { error: userUpdateError } = await this.params.userRepository.update(updatedUser);

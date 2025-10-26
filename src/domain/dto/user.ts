@@ -1,3 +1,4 @@
+import RequestContext from "@/core/context/context";
 import { TenantEntity, UserEntity } from "../entities";
 import { BaseResponseDto, BaseRequestDto } from "./base";
 import { Err } from "@/types/errors";
@@ -35,10 +36,15 @@ export class UserRequest extends BaseRequestDto {
     }
 
     toDomain(): UserEntity {
+        const userId = RequestContext.tryGetUserId();
+        console.log("userId", userId);
+
         return UserEntity.create({
             name: this.name,
             email: this.email,
             avatarUrl: this.avatarUrl || null,
+            updatedBy: userId,
+            createdBy: userId,
         });
     }
 }

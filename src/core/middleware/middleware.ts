@@ -310,7 +310,7 @@ export class MiddlewareService {
                     data: result
                 });
             } catch (error) {
-                return this.handleError(error, req);
+                return MiddlewareService.handleError(error, req);
             }
         };
     }
@@ -331,7 +331,7 @@ export class MiddlewareService {
                     data: result
                 });
             } catch (error) {
-                return this.handleError(error, req);
+                return MiddlewareService.handleError(error, req);
             }
         };
     }
