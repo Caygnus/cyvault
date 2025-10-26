@@ -2,24 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { User } from '@supabase/supabase-js';
 
-export const UserHeaders = {
-    USER_ID: 'x-user-id',
-    USER_EMAIL: 'x-user-email',
-    TENANT_ID: 'x-tenant-id'
-} as const;
+export enum UserHeaders {
+    USER_ID = 'x-user-id',
+    USER_EMAIL = 'x-user-email',
+    TENANT_ID = 'x-tenant-id'
+}
 
-export const RouteType = {
-    PAGE: 'page',
-    API: 'api'
-} as const;
+export enum RouteType {
+    PAGE = 'page',
+    API = 'api'
+}
 
-export const PROTECTED_ROUTES = [
-    '/',
-    '/dashboard',
-    '/profile',
-    '/settings',
-    '/admin'
-] as const;
 
 export const PUBLIC_API_ROUTES = [
     '/api/auth',
@@ -27,12 +20,14 @@ export const PUBLIC_API_ROUTES = [
 ] as const;
 
 export const PUBLIC_ROUTES = [
+    '/',
     '/login',
     '/signup',
-    '/forgot-password',
-    '/reset-password',
     '/_next',
-    '/favicon.ico'
+    '/favicon.ico',
+    '/robots.txt',
+    '/sitemap.xml',
+    '/robots.txt',
 ] as const;
 
 const ROUTE_PATTERNS = {
@@ -206,13 +201,13 @@ export class MiddlewareService {
     }
 
     static isRouteProtected(pathname: string): boolean {
+        // If it's a public route, it's not protected
         if (this.isPublicRoute(pathname)) {
             return false;
         }
-        if (this.isApiRoute(pathname)) {
-            return true;
-        }
-        return PROTECTED_ROUTES.some(route => this.matchesRoute(pathname, route));
+
+        // All other routes are protected by default
+        return true;
     }
 
     static getCurrentUserId(request: NextRequest): string | null {

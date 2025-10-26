@@ -1,12 +1,5 @@
-/**
- * Unified Middleware Service
- * Single interface for all middleware functionality
- */
-
-// Main service class with all methods
 export { MiddlewareService } from './middleware';
 
-// Individual method exports for convenience
 export {
     isAuthenticated,
     getCurrentUserId,
@@ -23,12 +16,10 @@ export {
     getRouteType,
     UserHeaders,
     RouteType,
-    PROTECTED_ROUTES,
     PUBLIC_API_ROUTES,
     PUBLIC_ROUTES
 } from './middleware';
 
-// Error handling middleware
 export {
     withErrorHandler,
     withApiErrorHandler,
@@ -39,5 +30,4 @@ export {
     createNotFoundErrorResponse
 } from './error-handler';
 
-// Re-export types from Supabase
 export type { User, Session } from '@supabase/supabase-js';
