@@ -1,14 +1,13 @@
 import { createServerClient } from '@supabase/ssr'
+import { Session, User } from '@supabase/supabase-js';
 import { cookies } from 'next/headers'
-import type { User, Session, AuthResult, SessionResult } from './types'
-import { AUTH_ERRORS } from './types'
 
 // Environment variables with validation
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAdminKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAdminKey) {
-    throw new Error(AUTH_ERRORS.MISSING_URL);
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variable');
 }
 
 /**
@@ -88,48 +87,4 @@ export async function getCurrentSession(): Promise<Session | null> {
 export async function isAuthenticated(): Promise<boolean> {
     const user = await getCurrentUser();
     return user !== null;
-}
-
-/**
- * Get user with error handling
- * Returns both user and any error that occurred
- */
-export async function getUserWithError(): Promise<AuthResult> {
-    try {
-        const supabase = await createClient()
-        const { data: { user }, error } = await supabase.auth.getUser()
-
-        if (error) {
-            return { user: null, error: new Error(error.message) };
-        }
-
-        return { user, error: null };
-    } catch (error) {
-        return {
-            user: null,
-            error: error instanceof Error ? error : new Error('Unknown error occurred')
-        };
-    }
-}
-
-/**
- * Get session with error handling
- * Returns both session and any error that occurred
- */
-export async function getSessionWithError(): Promise<SessionResult> {
-    try {
-        const supabase = await createClient()
-        const { data: { session }, error } = await supabase.auth.getSession()
-
-        if (error) {
-            return { session: null, error: new Error(error.message) };
-        }
-
-        return { session, error: null };
-    } catch (error) {
-        return {
-            session: null,
-            error: error instanceof Error ? error : new Error('Unknown error occurred')
-        };
-    }
 }
