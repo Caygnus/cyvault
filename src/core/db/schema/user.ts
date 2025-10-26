@@ -1,14 +1,11 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text } from "drizzle-orm/pg-core";
+import { baseModel } from "./base";
 
 export const users = pgTable("users", {
-    id: uuid("id").primaryKey(), // Supabase user ID
+    ...baseModel,
     name: text("name").notNull(),
     email: text("email").unique().notNull(),
     avatarUrl: text("avatar_url"),
-    createdBy: uuid("created_by"),
-    updatedBy: uuid("updated_by"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type User = typeof users.$inferSelect;
