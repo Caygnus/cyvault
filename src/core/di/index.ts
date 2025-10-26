@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { container } from "tsyringe";
 import { db } from "@/core/db/client";
 import type { Database, TransactionDatabase } from "@/core/db/client";
-import { UserRepositoryImpl, type UserRepository } from "@/domain/repository/user";
+import { UserRepositoryImpl, type UserRepository, TenantRepositoryImpl, type TenantRepository } from "@/domain";
 import { injectable } from "tsyringe";
 
 // DI Tokens
@@ -19,11 +19,11 @@ let _initialized = false;
 @injectable()
 export class RepoParams {
     readonly userRepository: UserRepository;
-    // readonly tenantRepository: TenantRepository;
+    readonly tenantRepository: TenantRepository;
 
     constructor(private readonly db: Database | TransactionDatabase) {
         this.userRepository = new UserRepositoryImpl(db as Database);
-        // this.tenantRepository = new TenantRepositoryImpl(db);
+        this.tenantRepository = new TenantRepositoryImpl(db as Database);
     }
 
     static withTransaction(tx: Database | TransactionDatabase): RepoParams {

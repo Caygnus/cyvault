@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withApiErrorHandler } from "@/core/middleware/error-handler";
 import { ensureBootstrap, getRepoParams } from "@/core/di";
-import { AuthServiceImpl } from "@/services/auth";
-import { SignupRequest } from "@/domain/dto/auth";
+import { AuthServiceImpl } from "@/services";
+import { SignupRequest } from "@/domain";
 
 /**
  * POST /api/auth/signup - Complete user registration after Supabase auth

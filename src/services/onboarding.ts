@@ -1,7 +1,5 @@
 import { RepoParams } from "@/core/di";
-import { SignupRequest } from "@/domain/dto/auth";
-import { TenantRequest } from "@/domain/dto/tenant";
-import { UserEntity } from "@/domain/entities";
+import { SignupRequest, TenantRequest, UserEntity } from "@/domain";
 
 interface OnboardingService {
     onboardUser(request: SignupRequest, user: UserEntity): Promise<void>;
