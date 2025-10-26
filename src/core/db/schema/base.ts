@@ -1,4 +1,4 @@
-import { text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { text, timestamp } from "drizzle-orm/pg-core";
 import { EntityStatus } from "@/types";
 
 /**
@@ -9,10 +9,10 @@ import { EntityStatus } from "@/types";
  * This allows the fields to be properly spread into table definitions.
  */
 export const baseModel = {
-    id: uuid("id").primaryKey(),
+    id: text("id").primaryKey(),
     status: text("status").default(EntityStatus.PUBLISHED).notNull(),
-    createdBy: uuid("created_by"),
-    updatedBy: uuid("updated_by"),
+    createdBy: text("created_by"),  // Supabase UUID
+    updatedBy: text("updated_by"),  // Supabase UUID
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 } as const;

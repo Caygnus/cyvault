@@ -16,7 +16,7 @@ export class AuthServiceImpl implements AuthService {
 
         // get the user from supabase for its id 
         const supabase = await createClient();
-        const { data: { user: supabaseUser }, error: supabaseError } = await supabase.auth.getUser();
+        const { data: { user: supabaseUser }, error: supabaseError } = await supabase.auth.getUser(request.token);
         if (supabaseError) throw supabaseError;
 
         user = user.with({ id: supabaseUser?.id ?? "" });

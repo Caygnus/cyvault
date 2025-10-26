@@ -15,12 +15,12 @@ export enum RouteType {
 
 
 export const PUBLIC_API_ROUTES = [
-    '/api/auth',
     '/api/health',
+    '/api/auth/signup',
+    '/api/auth/login',
 ] as const;
 
 export const PUBLIC_ROUTES = [
-    '/',
     '/login',
     '/signup',
     '/_next',
