@@ -28,5 +28,16 @@ export {
     PUBLIC_ROUTES
 } from './middleware';
 
+// Error handling middleware
+export {
+    withErrorHandler,
+    withApiErrorHandler,
+    withCustomErrorHandler,
+    createErrorResponse,
+    createSuccessResponse,
+    createValidationErrorResponse,
+    createNotFoundErrorResponse
+} from './error-handler';
+
 // Re-export types from Supabase
 export type { User, Session } from '@supabase/supabase-js';
