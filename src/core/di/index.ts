@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { container } from "tsyringe";
 import { db } from "@/core/db/client";
 import type { Database, TransactionDatabase } from "@/core/db/client";
-import { UserRepositoryImpl, type UserRepository } from "@/domain/repository/User";
+import { UserRepositoryImpl, type UserRepository } from "@/domain/repository/user";
 import { injectable } from "tsyringe";
 
 // DI Tokens

@@ -1,3 +1,3 @@
-export { BaseEntity } from "./BaseEntity";
-export { UserEntity } from "./User";
-export { TenantEntity } from "./Tenant";
+export { BaseEntity } from "./base";
+export { UserEntity } from "./user";
+export { TenantEntity } from "./tenant";

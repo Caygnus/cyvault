@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureBootstrap, getRepoParams } from "@/core/di";
-import { UserService } from "@/services/UserService";
+import { UserService } from "@/services/user";
 
 /**
  * GET /api/users - List all users

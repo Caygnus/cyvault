@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureBootstrap, getRepoParams } from "@/core/di";
 import { Err, ErrorCode, toErrorResponse } from "@/types";
-import { UserService } from "@/services/UserService";
+import { UserService } from "@/services/user";
 
 type RouteParams = {
     params: Promise<{ id: string }>;

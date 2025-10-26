@@ -1,6 +1,6 @@
 import { Tenant as TenantDB } from '@/core/db/schema';
 import { EntityStatus } from '@/types';
-import { BaseEntity } from './BaseEntity';
+import { BaseEntity } from './base';
 
 export class TenantEntity extends BaseEntity {
     constructor(

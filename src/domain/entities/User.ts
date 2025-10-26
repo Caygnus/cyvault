@@ -1,6 +1,6 @@
 import { User as UserDB } from '@/core/db/schema';
 import { EntityStatus } from '@/types';
-import { BaseEntity } from './BaseEntity';
+import { BaseEntity } from './base';
 
 export class UserEntity extends BaseEntity {
     constructor(

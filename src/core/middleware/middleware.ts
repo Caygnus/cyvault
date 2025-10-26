@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import type { User } from '@supabase/supabase-js';
-import { AUTH_ERRORS } from '../supabase/types';
 
 export const UserHeaders = {
     USER_ID: 'x-user-id',
@@ -151,9 +150,8 @@ export class MiddlewareService {
         } else {
             return new NextResponse(
                 JSON.stringify({
-                    error: AUTH_ERRORS.UNAUTHORIZED,
+                    error: 'Unauthorized',
                     message: 'Authentication required',
-                    code: 'UNAUTHORIZED',
                     timestamp: new Date().toISOString()
                 }),
                 {
