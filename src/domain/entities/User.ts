@@ -1,6 +1,19 @@
 import { User as UserDB } from '@/core/db/schema';
 import { EntityStatus } from '@/types';
+import { generateUUIDWithPrefix, UUID_PREFIX } from '@/core/utils/uuid';
 import { BaseEntity } from './base';
+
+export interface UserEntityParams {
+    id?: string;
+    name: string;
+    email: string;
+    avatarUrl?: string | null;
+    status?: EntityStatus;
+    createdAt?: Date;
+    updatedAt?: Date;
+    createdBy?: string | null;
+    updatedBy?: string | null;
+}
 
 export class UserEntity extends BaseEntity {
     constructor(
@@ -89,6 +102,24 @@ export class UserEntity extends BaseEntity {
             updates.updatedAt ?? this.updatedAt,
             updates.createdBy ?? this.createdBy,
             updates.updatedBy ?? this.updatedBy,
+        );
+    }
+
+    /**
+     * Creates a new UserEntity instance from an object of parameters
+     */
+    static create(params: UserEntityParams): UserEntity {
+        const now = new Date();
+        return new UserEntity(
+            params.id ?? generateUUIDWithPrefix(UUID_PREFIX.USER),
+            params.name,
+            params.email,
+            params.avatarUrl ?? null,
+            params.status ?? EntityStatus.PUBLISHED,
+            params.createdAt ?? now,
+            params.updatedAt ?? now,
+            params.createdBy ?? null,
+            params.updatedBy ?? null,
         );
     }
 }
