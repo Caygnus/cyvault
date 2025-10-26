@@ -299,7 +299,10 @@ export class MiddlewareService {
     ): (req: NextRequest, ...args: unknown[]) => Promise<NextResponse> {
         return async (req: NextRequest, ...args: unknown[]): Promise<NextResponse> => {
             try {
-                const result = await handler(req, ...args);
+                // Initialize RequestContext from headers set by middleware
+                const result = await RequestContext.fromRequest(req, async () => {
+                    return await handler(req, ...args);
+                });
 
                 if (result instanceof NextResponse) {
                     return result;
@@ -320,7 +323,10 @@ export class MiddlewareService {
     ): (req: NextRequest, context?: { params: unknown }) => Promise<NextResponse> {
         return async (req: NextRequest, context?: { params: unknown }): Promise<NextResponse> => {
             try {
-                const result = await handler(req, context);
+                // Initialize RequestContext from headers set by middleware
+                const result = await RequestContext.fromRequest(req, async () => {
+                    return await handler(req, context);
+                });
 
                 if (result instanceof NextResponse) {
                     return result;
