@@ -2,7 +2,7 @@ import { RepoParams } from "@/core/di";
 import { SignupRequest, TenantRequest, UserEntity } from "@/domain";
 import { createClient } from "@/core/supabase/server";
 
-interface OnboardingService {
+export interface OnboardingService {
     onboardUser(request: SignupRequest, user: UserEntity): Promise<void>;
 }
 

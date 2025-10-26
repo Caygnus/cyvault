@@ -3,7 +3,7 @@ import { createClient } from "@/core/supabase/server";
 import { SignupRequest, SignupResponse } from "@/domain";
 import { OnboardingServiceImpl } from "@/service";
 
-interface AuthService {
+export interface AuthService {
     signup(request: SignupRequest): Promise<SignupResponse>;
 }
 
