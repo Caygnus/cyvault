@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureBootstrap, getRepoParams } from "@/core/di";
-import { UserService } from "@/services/user";
+import { UserServiceImpl } from "@/services/user";
 
 /**
  * GET /api/users - List all users
@@ -9,7 +9,7 @@ export async function GET() {
     try {
         await ensureBootstrap();
         const params = getRepoParams();
-        const userService = new UserService(params);
+        const userService = new UserServiceImpl(params);
 
         try {
             const users = await userService.listUsers();
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         }
 
         const params = getRepoParams();
-        const userService = new UserService(params);
+        const userService = new UserServiceImpl(params);
 
         try {
             const user = await userService.createUser({

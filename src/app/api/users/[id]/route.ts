@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureBootstrap, getRepoParams } from "@/core/di";
 import { Err, ErrorCode, toErrorResponse } from "@/types";
-import { UserService } from "@/services/user";
+import { UserServiceImpl } from "@/services/user";
 
 type RouteParams = {
     params: Promise<{ id: string }>;
@@ -18,7 +18,7 @@ export async function GET(
         await ensureBootstrap();
         const { id } = await params;
         const repoParams = getRepoParams();
-        const userService = new UserService(repoParams);
+        const userService = new UserServiceImpl(repoParams);
 
         const user = await userService.getUserById(id);
 
@@ -48,7 +48,7 @@ export async function PATCH(
         const { id } = await params;
         const body = await request.json();
         const repoParams = getRepoParams();
-        const userService = new UserService(repoParams);
+        const userService = new UserServiceImpl(repoParams);
 
         try {
             const user = await userService.updateUser(id, body);
@@ -82,7 +82,7 @@ export async function DELETE(
         await ensureBootstrap();
         const { id } = await params;
         const repoParams = getRepoParams();
-        const userService = new UserService(repoParams);
+        const userService = new UserServiceImpl(repoParams);
 
         try {
             await userService.deleteUser(id);

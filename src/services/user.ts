@@ -5,18 +5,37 @@ import { RepoParams } from "@/core/di";
 import { EntityStatus } from "@/types";
 import { Err } from "@/types";
 
+// Service interface
+export interface UserService {
+    getUserById(id: string): Promise<UserEntity | null>;
+    getUserByEmail(email: string): Promise<UserEntity | null>;
+    createUser(userData: {
+        id: string;
+        name: string;
+        email: string;
+        avatarUrl?: string | null;
+    }): Promise<UserEntity>;
+    listUsers(filter?: UserFilter): Promise<UserEntity[]>;
+    updateUser(
+        id: string,
+        updates: Partial<Pick<UserEntity, "name" | "avatarUrl">>
+    ): Promise<UserEntity>;
+    deleteUser(id: string): Promise<void>;
+}
+
+// Implementation
 @injectable()
-export class UserService {
+export class UserServiceImpl implements UserService {
     constructor(private readonly params: RepoParams) { }
 
     async getUserById(id: string): Promise<UserEntity | null> {
-        const {data, error} = await this.params.userRepository.findById(id);
+        const { data, error } = await this.params.userRepository.findById(id);
         if (error) throw error;
         return data;
     }
 
     async getUserByEmail(email: string): Promise<UserEntity | null> {
-        const {data, error} = await this.params.userRepository.findByEmail(email);
+        const { data, error } = await this.params.userRepository.findByEmail(email);
         if (error) throw error;
         return data;
     }
@@ -44,13 +63,13 @@ export class UserService {
             null
         );
 
-        const {data, error} = await this.params.userRepository.create(user);
+        const { data, error } = await this.params.userRepository.create(user);
         if (error) throw error;
         return data;
     }
 
     async listUsers(filter?: UserFilter): Promise<UserEntity[]> {
-        const {data, error} = await this.params.userRepository.findAll(filter);
+        const { data, error } = await this.params.userRepository.findAll(filter);
         if (error) throw error;
         return data;
     }
@@ -69,13 +88,13 @@ export class UserService {
             updatedAt: new Date(),
         });
 
-        const {data, error} = await this.params.userRepository.update(updatedUser);
+        const { data, error } = await this.params.userRepository.update(updatedUser);
         if (error) throw error;
         return data!;
     }
 
     async deleteUser(id: string): Promise<void> {
-        const {error} = await this.params.userRepository.delete(id);
+        const { error } = await this.params.userRepository.delete(id);
         if (error) throw error;
         return undefined;
     }
