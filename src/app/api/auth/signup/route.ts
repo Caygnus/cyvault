@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withApiErrorHandler } from "@/core/middleware/error-handler";
 import { ensureBootstrap, getRepoParams } from "@/core/di";
-import { AuthServiceImpl } from "@/services";
+import { AuthServiceImpl } from "@/service";
 import { SignupRequest } from "@/domain";
 
 /**

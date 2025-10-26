@@ -1,7 +1,7 @@
 import { RepoParams } from "@/core/di";
 import { createClient } from "@/core/supabase/server";
 import { SignupRequest, SignupResponse } from "@/domain";
-import { OnboardingServiceImpl } from "@/services";
+import { OnboardingServiceImpl } from "@/service";
 
 interface AuthService {
     signup(request: SignupRequest): Promise<SignupResponse>;
