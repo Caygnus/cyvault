@@ -1,9 +1,18 @@
 #!/usr/bin/env node
 
-import { execSync } from 'child_process';
+import postgres from 'postgres';
+import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
+
+// Load environment variables
+dotenv.config({ path: '.env' });
 
 // Colors for console output
 const colors = {
@@ -19,229 +28,672 @@ function log(message, color = 'reset') {
     console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-function execCommand(command, description) {
-    log(`\n${colors.blue}→ ${description}...${colors.reset}`);
-    try {
-        const output = execSync(command, { encoding: 'utf8', stdio: 'pipe' });
-        log(`✅ ${description} completed`, 'green');
-        return output;
-    } catch (error) {
-        log(`❌ ${description} failed: ${error.message}`, 'red');
-        throw error;
-    }
-}
-
-function checkEnvironment() {
-    log('🔍 Checking environment...', 'blue');
-
-    if (!fs.existsSync('.env')) {
-        throw new Error('❌ .env file not found. Please create it with DATABASE_URL');
+// Dynamic schema reader - automatically reads from Drizzle schema files
+class DynamicSchemaReader {
+    constructor() {
+        this.schemaPath = path.join(__dirname, '..', 'src', 'core', 'db', 'schema');
     }
 
-    dotenv.config({ path: '.env' });
-    if (!process.env.DATABASE_URL) {
-        throw new Error('❌ DATABASE_URL not found in .env');
-    }
+    async readSchemaDefinitions() {
+        log('📖 Reading Drizzle schema files...', 'blue');
 
-    log('✅ Environment check passed', 'green');
-}
+        const schemaFiles = this.getSchemaFiles();
+        const schemaDefinitions = {};
 
-function generateIncrementalMigration() {
-    log('📝 Generating incremental migration...', 'blue');
-
-    try {
-        execCommand('npx drizzle-kit generate', 'Generating migration files');
-
-        const drizzleDir = 'drizzle';
-        if (fs.existsSync(drizzleDir)) {
-            const files = fs.readdirSync(drizzleDir);
-            const sqlFiles = files.filter(f => f.endsWith('.sql') && !f.includes('fix_'));
-
-            if (sqlFiles.length > 0) {
-                log(`✅ Generated ${sqlFiles.length} incremental migration file(s)`, 'green');
-                return sqlFiles;
+        for (const filePath of schemaFiles) {
+            try {
+                const tableDefinitions = await this.parseSchemaFile(filePath);
+                Object.assign(schemaDefinitions, tableDefinitions);
+            } catch (error) {
+                log(`⚠️  Warning: Could not parse ${filePath}: ${error.message}`, 'yellow');
             }
         }
 
-        log('ℹ️  No new migrations needed', 'blue');
-        return [];
-    } catch (error) {
-        log('❌ Migration generation failed', 'red');
-        throw error;
+        log(`✅ Found ${Object.keys(schemaDefinitions).length} table definitions`, 'green');
+        return schemaDefinitions;
     }
-}
 
-function previewMigration() {
-    log('👀 Previewing migration...', 'blue');
+    getSchemaFiles() {
+        const schemaFiles = [];
 
-    const drizzleDir = 'drizzle';
-    if (fs.existsSync(drizzleDir)) {
-        const files = fs.readdirSync(drizzleDir);
-        const sqlFiles = files.filter(f => f.endsWith('.sql') && !f.includes('fix_'));
+        if (fs.existsSync(this.schemaPath)) {
+            const files = fs.readdirSync(this.schemaPath);
+            const tsFiles = files.filter(file =>
+                file.endsWith('.ts') &&
+                !file.includes('.d.ts') &&
+                file !== 'index.ts'
+            );
 
-        if (sqlFiles.length > 0) {
-            log('📄 Migration files to be applied:', 'yellow');
-            sqlFiles.forEach(file => {
-                const filePath = path.join(drizzleDir, file);
-                const content = fs.readFileSync(filePath, 'utf8');
-                log(`\n--- ${file} ---`, 'yellow');
-                console.log(content);
-                log('--- End ---\n', 'yellow');
-            });
-        }
-    }
-}
-
-function applyMigration() {
-    log('🚀 Applying migration...', 'blue');
-
-    try {
-        execCommand('npx drizzle-kit migrate', 'Applying migration to database');
-        log('✅ Migration applied successfully', 'green');
-    } catch (error) {
-        log('❌ Migration failed', 'red');
-        throw error;
-    }
-}
-
-function directPush() {
-    log('🔄 Using direct push instead of migration...', 'blue');
-
-    try {
-        execCommand('npx drizzle-kit push', 'Pushing schema directly to database');
-        log('✅ Schema pushed successfully', 'green');
-    } catch (error) {
-        log('❌ Direct push failed', 'red');
-        throw error;
-    }
-}
-
-function createBackup() {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupDir = `backups/smart-migration-${timestamp}`;
-
-    log(`📦 Creating backup in ${backupDir}...`, 'blue');
-
-    fs.mkdirSync(backupDir, { recursive: true });
-
-    try {
-        execCommand('npx drizzle-kit export', 'Exporting current schema');
-
-        if (fs.existsSync('drizzle/export')) {
-            fs.cpSync('drizzle/export', `${backupDir}/schema`, { recursive: true });
+            schemaFiles.push(...tsFiles.map(file => path.join(this.schemaPath, file)));
         }
 
-        log(`✅ Backup created at ${backupDir}`, 'green');
-        return backupDir;
-    } catch (error) {
-        log(`⚠️  Backup creation failed, but continuing...`, 'yellow');
-        return null;
+        return schemaFiles;
+    }
+
+    async parseSchemaFile(filePath) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const tableDefinitions = {};
+
+        // Extract table definitions using regex patterns
+        const tableMatches = content.match(/export\s+const\s+(\w+)\s*=\s*pgTable\s*\(\s*["']([^"']+)["']\s*,\s*\{([^}]+)\}/gs);
+
+        if (!tableMatches) return tableDefinitions;
+
+        for (const match of tableMatches) {
+            const tableName = match.match(/export\s+const\s+(\w+)\s*=\s*pgTable/)[1];
+            const tableSchemaName = match.match(/pgTable\s*\(\s*["']([^"']+)["']/)[1];
+            const tableBody = match.match(/pgTable\s*\(\s*["']([^"']+)["']\s*,\s*\{([^}]+)\}/)[2];
+
+            // Parse base model if it exists
+            const baseModelColumns = await this.parseBaseModel(content);
+
+            // Parse table-specific columns
+            const tableColumns = this.parseColumns(tableBody);
+
+            // Merge base model columns with table columns
+            const columns = { ...baseModelColumns, ...tableColumns };
+
+            const indexes = this.parseIndexes(content, tableName);
+            const constraints = this.parseConstraints(content, tableName);
+
+            tableDefinitions[tableSchemaName] = {
+                columns,
+                indexes,
+                constraints
+            };
+        }
+
+        return tableDefinitions;
+    }
+
+    async parseBaseModel(content) {
+        const baseModelColumns = {};
+
+        // Check if this file imports baseModel
+        if (content.includes('baseModel')) {
+            const baseModelPath = path.join(this.schemaPath, 'base.ts');
+            if (fs.existsSync(baseModelPath)) {
+                const baseContent = fs.readFileSync(baseModelPath, 'utf8');
+
+                // Extract baseModel definition
+                const baseModelMatch = baseContent.match(/export\s+const\s+baseModel\s*=\s*\{([^}]+)\}/s);
+                if (baseModelMatch) {
+                    const baseModelBody = baseModelMatch[1];
+                    const baseColumns = this.parseColumns(baseModelBody);
+                    Object.assign(baseModelColumns, baseColumns);
+                }
+            }
+        }
+
+        return baseModelColumns;
+    }
+
+    parseColumns(tableBody) {
+        const columns = {};
+
+        // Parse individual column definitions - extract both camelCase name and snake_case database name
+        const columnMatches = tableBody.match(/(\w+):\s*([^,}]+)/g);
+
+        if (columnMatches) {
+            for (const match of columnMatches) {
+                const [, camelCaseName, columnDef] = match.match(/(\w+):\s*([^,}]+)/);
+
+                // Extract the actual database column name from the Drizzle definition
+                // e.g., text("created_at") -> "created_at"
+                const dbNameMatch = columnDef.match(/text\("([^"]+)"\)|timestamp\("([^"]+)"\)/);
+                const dbColumnName = dbNameMatch ? (dbNameMatch[1] || dbNameMatch[2]) : camelCaseName;
+
+                const columnInfo = this.parseColumnDefinition(columnDef.trim());
+                if (columnInfo) {
+                    columns[dbColumnName] = columnInfo;
+                }
+            }
+        }
+
+        return columns;
+    }
+
+    parseColumnDefinition(columnDef) {
+        // Handle different column types and modifiers
+        const info = {
+            type: 'text',
+            nullable: true,
+            primaryKey: false,
+            unique: false,
+            defaultValue: null
+        };
+
+        // Extract type - handle Drizzle syntax like text("column_name")
+        if (columnDef.includes('text(')) {
+            info.type = 'text';
+        } else if (columnDef.includes('timestamp(')) {
+            info.type = 'timestamp';
+        } else if (columnDef.includes('integer(')) {
+            info.type = 'integer';
+        } else if (columnDef.includes('boolean(')) {
+            info.type = 'boolean';
+        }
+
+        // Extract modifiers - handle Drizzle method chaining
+        if (columnDef.includes('.notNull()')) {
+            info.nullable = false;
+        }
+
+        if (columnDef.includes('.primaryKey()')) {
+            info.primaryKey = true;
+            info.nullable = false;
+        }
+
+        if (columnDef.includes('.unique()')) {
+            info.unique = true;
+        }
+
+        // Extract default values - handle different default types
+        const defaultMatch = columnDef.match(/\.default\(([^)]+)\)/);
+        if (defaultMatch) {
+            let defaultValue = defaultMatch[1];
+
+            // Handle EntityStatus.PUBLISHED
+            if (defaultValue.includes('EntityStatus.PUBLISHED')) {
+                info.defaultValue = "'PUBLISHED'";
+            }
+            // Handle defaultNow()
+            else if (defaultValue.includes('defaultNow()')) {
+                info.defaultValue = 'now()';
+            }
+            // Handle string literals
+            else if (defaultValue.startsWith('"') && defaultValue.endsWith('"')) {
+                // Convert double quotes to single quotes for SQL
+                info.defaultValue = defaultValue.replace(/"/g, "'");
+            }
+            // Handle empty string
+            else if (defaultValue === '""') {
+                info.defaultValue = "''";
+            }
+            else {
+                info.defaultValue = defaultValue;
+            }
+        }
+
+        return info;
+    }
+
+    parseIndexes(content, tableName) {
+        const indexes = [];
+
+        // Look for index definitions in the file
+        const indexMatches = content.match(/CREATE\s+INDEX[^;]+/gi);
+        if (indexMatches) {
+            for (const indexMatch of indexMatches) {
+                const nameMatch = indexMatch.match(/CREATE\s+INDEX\s+["']?(\w+)["']?/i);
+                const columnsMatch = indexMatch.match(/ON\s+["']?(\w+)["']?\s*\(([^)]+)\)/i);
+
+                if (nameMatch && columnsMatch) {
+                    indexes.push({
+                        name: nameMatch[1],
+                        columns: columnsMatch[2].split(',').map(col => col.trim().replace(/['"]/g, ''))
+                    });
+                }
+            }
+        }
+
+        return indexes;
+    }
+
+    parseConstraints(content, tableName) {
+        const constraints = [];
+
+        // Look for foreign key constraints - handle Drizzle syntax
+        const fkMatches = content.match(/\.references\([^)]+\)/g);
+        if (fkMatches) {
+            for (const fkMatch of fkMatches) {
+                // Handle syntax like .references(() => tenants.id)
+                const refMatch = fkMatch.match(/\.references\(\s*\(\)\s*=>\s*(\w+)\.(\w+)/);
+                if (refMatch) {
+                    constraints.push({
+                        name: `${tableName}_${refMatch[2]}_${refMatch[1]}_fk`,
+                        type: 'FOREIGN KEY',
+                        columns: [refMatch[2]],
+                        references: { table: refMatch[1], column: refMatch[2] },
+                        onDelete: 'no action',
+                        onUpdate: 'no action'
+                    });
+                }
+            }
+        }
+
+        return constraints;
     }
 }
 
-function validateSchema() {
-    log('🔍 Validating schema...', 'blue');
-
-    const schemaPath = 'src/core/db/schema';
-    if (!fs.existsSync(schemaPath)) {
-        throw new Error('❌ Schema directory not found');
+class DatabaseMigrator {
+    constructor() {
+        this.sql = postgres(process.env.DATABASE_URL);
+        this.changes = [];
+        this.schemaReader = new DynamicSchemaReader();
     }
 
-    try {
-        execCommand('npx tsc --noEmit', 'Type checking schema');
-        log('✅ Schema validation passed', 'green');
-    } catch (error) {
-        log('❌ Schema validation failed. Please fix TypeScript errors first.', 'red');
-        throw error;
+    async getCurrentSchema() {
+        const tables = {};
+
+        // Get all tables from the database
+        const allTables = await this.sql`
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        `;
+
+        for (const table of allTables) {
+            const tableName = table.table_name;
+            // Get table columns
+            const columns = await this.sql`
+                SELECT 
+                    column_name,
+                    data_type,
+                    is_nullable,
+                    column_default,
+                    character_maximum_length
+                FROM information_schema.columns 
+                WHERE table_name = ${tableName} AND table_schema = 'public'
+                ORDER BY ordinal_position
+            `;
+
+            if (columns.length > 0) {
+                tables[tableName] = {
+                    columns: columns.reduce((acc, col) => {
+                        acc[col.column_name] = {
+                            type: col.data_type,
+                            nullable: col.is_nullable === 'YES',
+                            defaultValue: col.column_default,
+                            maxLength: col.character_maximum_length
+                        };
+                        return acc;
+                    }, {}),
+                    indexes: await this.getTableIndexes(tableName),
+                    constraints: await this.getTableConstraints(tableName)
+                };
+            }
+        }
+
+        return tables;
+    }
+
+    async getTableIndexes(tableName) {
+        const indexes = await this.sql`
+            SELECT 
+                indexname,
+                indexdef
+            FROM pg_indexes 
+            WHERE tablename = ${tableName} AND schemaname = 'public'
+        `;
+
+        return indexes.map(idx => ({
+            name: idx.indexname,
+            definition: idx.indexdef
+        }));
+    }
+
+    async getTableConstraints(tableName) {
+        const constraints = await this.sql`
+            SELECT 
+                tc.constraint_name,
+                tc.constraint_type,
+                kcu.column_name,
+                ccu.table_name AS foreign_table_name,
+                ccu.column_name AS foreign_column_name,
+                rc.delete_rule,
+                rc.update_rule
+            FROM information_schema.table_constraints AS tc 
+            LEFT JOIN information_schema.key_column_usage AS kcu
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+            LEFT JOIN information_schema.constraint_column_usage AS ccu
+                ON ccu.constraint_name = tc.constraint_name
+                AND ccu.table_schema = tc.table_schema
+            LEFT JOIN information_schema.referential_constraints AS rc
+                ON tc.constraint_name = rc.constraint_name
+                AND tc.table_schema = rc.constraint_schema
+            WHERE tc.table_name = ${tableName} AND tc.table_schema = 'public'
+        `;
+
+        return constraints.map(constraint => ({
+            name: constraint.constraint_name,
+            type: constraint.constraint_type,
+            column: constraint.column_name,
+            foreignTable: constraint.foreign_table_name,
+            foreignColumn: constraint.foreign_column_name,
+            onDelete: constraint.delete_rule,
+            onUpdate: constraint.update_rule
+        }));
+    }
+
+    async detectChanges() {
+        log('🔍 Detecting schema changes...', 'blue');
+
+        // Read schema definitions dynamically from Drizzle files
+        const SCHEMA_DEFINITIONS = await this.schemaReader.readSchemaDefinitions();
+
+        const currentSchema = await this.getCurrentSchema();
+        const changes = [];
+
+        for (const [tableName, expectedSchema] of Object.entries(SCHEMA_DEFINITIONS)) {
+            const currentTable = currentSchema[tableName];
+
+            if (!currentTable) {
+                // Table doesn't exist - needs to be created
+                changes.push({
+                    type: 'CREATE_TABLE',
+                    table: tableName,
+                    schema: expectedSchema
+                });
+                continue;
+            }
+
+            // Check for missing columns
+            for (const [columnName, columnDef] of Object.entries(expectedSchema.columns)) {
+                if (!currentTable.columns[columnName]) {
+                    changes.push({
+                        type: 'ADD_COLUMN',
+                        table: tableName,
+                        column: columnName,
+                        definition: columnDef
+                    });
+                } else {
+                    // Check for column modifications
+                    const currentCol = currentTable.columns[columnName];
+                    if (this.hasColumnChanged(currentCol, columnDef)) {
+                        changes.push({
+                            type: 'MODIFY_COLUMN',
+                            table: tableName,
+                            column: columnName,
+                            current: currentCol,
+                            expected: columnDef
+                        });
+                    }
+                }
+            }
+
+            // Check for missing indexes
+            for (const expectedIndex of expectedSchema.indexes) {
+                const existingIndex = currentTable.indexes.find(idx =>
+                    idx.name === expectedIndex.name
+                );
+                if (!existingIndex) {
+                    changes.push({
+                        type: 'CREATE_INDEX',
+                        table: tableName,
+                        index: expectedIndex
+                    });
+                }
+            }
+
+            // Check for missing constraints
+            for (const expectedConstraint of expectedSchema.constraints) {
+                const existingConstraint = currentTable.constraints.find(con =>
+                    con.name === expectedConstraint.name
+                );
+                if (!existingConstraint) {
+                    changes.push({
+                        type: 'ADD_CONSTRAINT',
+                        table: tableName,
+                        constraint: expectedConstraint
+                    });
+                }
+            }
+        }
+
+        this.changes = changes;
+        return changes;
+    }
+
+    hasColumnChanged(current, expected) {
+        // Normalize types for comparison
+        const normalizeType = (type) => {
+            const typeMap = {
+                'character varying': 'text',
+                'varchar': 'text',
+                'timestamp without time zone': 'timestamp',
+                'timestamp with time zone': 'timestamp'
+            };
+            return typeMap[type] || type;
+        };
+
+        const normalizedCurrentType = normalizeType(current.type);
+        const normalizedExpectedType = normalizeType(expected.type);
+
+        // Check type
+        if (normalizedCurrentType !== normalizedExpectedType) {
+            log(`Type mismatch: ${normalizedCurrentType} vs ${normalizedExpectedType}`, 'yellow');
+            return true;
+        }
+
+        // Check nullable
+        if (current.nullable !== expected.nullable) {
+            log(`Nullable mismatch: ${current.nullable} vs ${expected.nullable}`, 'yellow');
+            return true;
+        }
+
+        // Check default value (normalize for comparison)
+        const normalizeDefault = (defaultValue) => {
+            if (!defaultValue) return null;
+            // Remove quotes, type casts, and normalize common defaults
+            let normalized = defaultValue
+                .replace(/::\w+$/g, '') // Remove type casts like ::text first
+                .replace(/^['"]|['"]$/g, '') // Remove quotes
+                .toLowerCase()
+                .trim();
+
+            // Handle empty string cases
+            if (normalized === '' || normalized === "''" || normalized === '""') {
+                return '';
+            }
+
+            return normalized;
+        };
+
+        const currentDefault = normalizeDefault(current.defaultValue);
+        const expectedDefault = normalizeDefault(expected.defaultValue);
+
+        // Skip if both are effectively empty/null
+        if ((!currentDefault || currentDefault === 'null' || currentDefault === '') &&
+            (!expectedDefault || expectedDefault === 'null' || expectedDefault === '')) {
+            return false;
+        }
+
+        // Skip if both are effectively now() (timestamp defaults)
+        if ((currentDefault === 'now()' || currentDefault === 'null') && expectedDefault === 'now()') {
+            return false;
+        }
+
+        // Skip if current is now() and expected is null (both are valid timestamp defaults)
+        if (currentDefault === 'now()' && (!expectedDefault || expectedDefault === 'null')) {
+            return false;
+        }
+
+        // Skip if both are effectively the same after normalization
+        if (currentDefault === expectedDefault) {
+            return false;
+        }
+
+        // Skip minor formatting differences
+        if (currentDefault && expectedDefault) {
+            const cleanCurrent = currentDefault.replace(/['"]/g, '');
+            const cleanExpected = expectedDefault.replace(/['"]/g, '');
+            if (cleanCurrent === cleanExpected) {
+                return false;
+            }
+        }
+
+        log(`Default mismatch: ${currentDefault} vs ${expectedDefault}`, 'yellow');
+        return true;
+    }
+
+    async applyChanges() {
+        if (this.changes.length === 0) {
+            log('✅ No changes detected. Database is up to date.', 'green');
+            return;
+        }
+
+        log(`📝 Found ${this.changes.length} changes to apply:`, 'blue');
+        this.changes.forEach((change, index) => {
+            log(`  ${index + 1}. ${change.type} on ${change.table}${change.column ? ` (${change.column})` : ''}`, 'yellow');
+        });
+
+        log('\n🚀 Applying changes...', 'blue');
+
+        for (const change of this.changes) {
+            try {
+                await this.applyChange(change);
+                log(`✅ Applied: ${change.type} on ${change.table}${change.column ? ` (${change.column})` : ''}`, 'green');
+            } catch (error) {
+                log(`❌ Failed to apply ${change.type} on ${change.table}: ${error.message}`, 'red');
+                throw error;
+            }
+        }
+
+        log('\n🎉 All changes applied successfully!', 'green');
+    }
+
+    async applyChange(change) {
+        switch (change.type) {
+            case 'CREATE_TABLE':
+                await this.createTable(change.table, change.schema);
+                break;
+            case 'ADD_COLUMN':
+                await this.addColumn(change.table, change.column, change.definition);
+                break;
+            case 'MODIFY_COLUMN':
+                await this.modifyColumn(change.table, change.column, change.expected);
+                break;
+            case 'CREATE_INDEX':
+                await this.createIndex(change.table, change.index);
+                break;
+            case 'ADD_CONSTRAINT':
+                await this.addConstraint(change.table, change.constraint);
+                break;
+        }
+    }
+
+    async createTable(tableName, schema) {
+        const columns = Object.entries(schema.columns)
+            .map(([name, def]) => {
+                let colDef = `"${name}" ${def.type}`;
+                if (def.primaryKey) colDef += ' PRIMARY KEY';
+                if (!def.nullable) colDef += ' NOT NULL';
+                if (def.defaultValue) colDef += ` DEFAULT ${def.defaultValue}`;
+                if (def.unique) colDef += ' UNIQUE';
+                return colDef;
+            })
+            .join(', ');
+
+        await this.sql.unsafe(`CREATE TABLE "${tableName}" (${columns})`);
+    }
+
+    async addColumn(tableName, columnName, definition) {
+        // Check if table has existing data
+        const rowCount = await this.sql.unsafe(`SELECT COUNT(*) as count FROM "${tableName}"`);
+        const hasData = parseInt(rowCount[0].count) > 0;
+
+        let colDef = `"${columnName}" ${definition.type}`;
+
+        // Debug logging
+        log(`🔍 Adding column: ${columnName}, definition:`, 'blue');
+        log(`   Type: ${definition.type}, Nullable: ${definition.nullable}, Default: ${definition.defaultValue}`, 'blue');
+
+        // If column is NOT NULL and table has data, add it as nullable first, then update
+        if (!definition.nullable && hasData) {
+            log(`⚠️  Adding NOT NULL column to table with data - adding as nullable first`, 'yellow');
+            colDef += ' NULL'; // Add as nullable first
+            if (definition.defaultValue) colDef += ` DEFAULT ${definition.defaultValue}`;
+
+            await this.sql.unsafe(`ALTER TABLE "${tableName}" ADD COLUMN ${colDef}`);
+
+            // Update existing rows with default value
+            if (definition.defaultValue) {
+                await this.sql.unsafe(`UPDATE "${tableName}" SET "${columnName}" = ${definition.defaultValue} WHERE "${columnName}" IS NULL`);
+            }
+
+            // Now make it NOT NULL
+            await this.sql.unsafe(`ALTER TABLE "${tableName}" ALTER COLUMN "${columnName}" SET NOT NULL`);
+        } else {
+            // Normal case - no existing data or nullable column
+            if (!definition.nullable) colDef += ' NOT NULL';
+            if (definition.defaultValue) colDef += ` DEFAULT ${definition.defaultValue}`;
+            if (definition.unique) colDef += ' UNIQUE';
+
+            await this.sql.unsafe(`ALTER TABLE "${tableName}" ADD COLUMN ${colDef}`);
+        }
+    }
+
+    async modifyColumn(tableName, columnName, definition) {
+        // PostgreSQL doesn't support direct column modification in all cases
+        // This is a simplified version - might need more complex logic for production
+        log(`⚠️  Column modification for ${tableName}.${columnName} - manual review recommended`, 'yellow');
+    }
+
+    async createIndex(tableName, index) {
+        const columns = index.columns.join(', ');
+        await this.sql.unsafe(`CREATE INDEX IF NOT EXISTS "${index.name}" ON "${tableName}" (${columns})`);
+    }
+
+    async addConstraint(tableName, constraint) {
+        if (constraint.type === 'FOREIGN KEY') {
+            const columns = constraint.columns.join(', ');
+            const refTable = constraint.references.table;
+            const refColumn = constraint.references.column;
+            const onDelete = constraint.onDelete || 'no action';
+            const onUpdate = constraint.onUpdate || 'no action';
+
+            await this.sql.unsafe(`
+                ALTER TABLE "${tableName}" 
+                ADD CONSTRAINT "${constraint.name}" 
+                FOREIGN KEY (${columns}) 
+                REFERENCES "${refTable}"("${refColumn}") 
+                ON DELETE ${onDelete} ON UPDATE ${onUpdate}
+            `);
+        }
+    }
+
+    async close() {
+        await this.sql.end();
     }
 }
 
 async function main() {
-    log(`${colors.bold}🚀 Migration Script${colors.reset}`, 'blue');
-    log('================================', 'blue');
-    log('This script applies schema changes with automatic fallback', 'blue');
-    log('✨ Always use: npm run db:migrate', 'green');
+    log(`${colors.bold}🚀 Database Migration${colors.reset}`, 'blue');
+    log('========================', 'blue');
+    log('Automatically detects and applies schema changes from your Drizzle files', 'blue');
 
-    let backupDir = null;
+    const migrator = new DatabaseMigrator();
 
     try {
-        // Step 1: Environment check
-        checkEnvironment();
+        // Check if DATABASE_URL is set
+        if (!process.env.DATABASE_URL) {
+            throw new Error('❌ DATABASE_URL not found in .env');
+        }
 
-        // Step 2: Create backup
-        backupDir = createBackup();
+        // Detect changes
+        const changes = await migrator.detectChanges();
 
-        // Step 3: Validate schema
-        validateSchema();
-
-        // Step 4: Generate migration
-        const migrationFiles = generateIncrementalMigration();
-
-        if (migrationFiles.length === 0) {
-            log('ℹ️  No migrations to apply. Database is up to date.', 'blue');
+        if (changes.length === 0) {
+            log('✅ No changes detected. Database is up to date.', 'green');
             return;
         }
 
-        // Step 5: Check if migration is just creating existing table
-        const hasCreateTable = migrationFiles.some(file => {
-            const filePath = path.join('drizzle', file);
-            const content = fs.readFileSync(filePath, 'utf8');
-            return content.includes('CREATE TABLE "users"');
+        // Show preview
+        log('\n📋 Changes to be applied:', 'yellow');
+        changes.forEach((change, index) => {
+            log(`  ${index + 1}. ${change.type} on ${change.table}${change.column ? ` (${change.column})` : ''}`, 'yellow');
         });
 
-        if (hasCreateTable) {
-            log('⚠️  Migration would create existing table, using direct push instead...', 'yellow');
-            log('This avoids the "relation already exists" error.', 'yellow');
-
-            try {
-                directPush();
-                log('\n🎉 Direct push completed successfully!', 'green');
-                log('✨ Schema changes have been applied to your database.', 'green');
-                return;
-            } catch (pushError) {
-                log('\n💥 Direct push failed', 'red');
-                throw pushError;
-            }
-        }
-
-        // Step 6: Preview migration
-        previewMigration();
-
-        // Step 7: Confirm before applying
-        log('\n⚠️  Ready to apply changes.', 'yellow');
-        log('This will modify your database with the changes from your schema.', 'yellow');
-        log('Press Ctrl+C to cancel, or wait 5 seconds to continue...', 'yellow');
-
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Step 8: Try migration first, fallback to direct push
-        try {
-            applyMigration();
-            log('\n🎉 Migration completed successfully!', 'green');
-            log('✨ Schema changes were applied to your database.', 'green');
-        } catch (migrationError) {
-            log('\n⚠️  Migration failed, trying direct push...', 'yellow');
-            log('This is common when introspection doesn\'t detect existing tables properly.', 'yellow');
-
-            try {
-                directPush();
-                log('\n🎉 Direct push completed successfully!', 'green');
-                log('✨ Schema changes have been applied to your database.', 'green');
-            } catch (pushError) {
-                log('\n💥 Both migration and direct push failed', 'red');
-                throw pushError;
-            }
-        }
+        // Apply changes
+        await migrator.applyChanges();
 
     } catch (error) {
         log(`\n💥 Migration failed: ${error.message}`, 'red');
-
-        if (backupDir && fs.existsSync(backupDir)) {
-            log('📦 Backup available for rollback', 'blue');
-            log('⚠️  Manual rollback required. Check backup directory.', 'yellow');
-        }
-
         process.exit(1);
+    } finally {
+        await migrator.close();
     }
 }
 
