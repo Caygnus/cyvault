@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { container } from "tsyringe";
-import { db } from "@/core/db/client";
-import type { Database, TransactionDatabase } from "@/core/db/client";
+import { db } from "@/db/client";
+import type { Database, TransactionDatabase } from "@/db/client";
 import { UserRepositoryImpl, type UserRepository, TenantRepositoryImpl, type TenantRepository } from "@/domain";
 import { injectable } from "tsyringe";
 

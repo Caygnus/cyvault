@@ -1,4 +1,4 @@
-import { User as UserDB } from '@/core/db/schema';
+import { User as UserDB } from '@/db/schema';
 import { EntityStatus } from '@/types';
 import { generateUUIDWithPrefix, UUID_PREFIX } from '@/core/utils/uuid';
 import { BaseEntity } from './base';

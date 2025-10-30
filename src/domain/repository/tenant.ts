@@ -1,7 +1,7 @@
 import { injectable } from "tsyringe";
 import { TenantFilter } from '@/domain/filters';
-import { tenants } from '@/core/db/schema';
-import type { Database } from '@/core/db/client';
+import { tenants } from '@/db/schema';
+import type { Database } from '@/db/client';
 import { TenantEntity } from '@/domain/entities';
 import { eq, and } from 'drizzle-orm';
 import type { AppError } from '@/types';

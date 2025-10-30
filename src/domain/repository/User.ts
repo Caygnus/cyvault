@@ -1,7 +1,7 @@
 import { injectable } from "tsyringe";
 import { UserFilter } from '@/domain/filters';
-import { users } from '@/core/db/schema';
-import type { Database } from '@/core/db/client';
+import { users } from '@/db/schema';
+import type { Database } from '@/db/client';
 import { UserEntity } from '@/domain/entities';
 import { eq, and } from 'drizzle-orm';
 import type { AppError } from '@/types';

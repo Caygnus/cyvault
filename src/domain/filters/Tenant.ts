@@ -1,7 +1,7 @@
 import { BaseFilter } from './filter';
 import { inArray, like, and } from 'drizzle-orm';
 import { EntityStatus, SortOrder } from '@/types';
-import { tenants } from '@/core/db/schema';
+import { tenants } from '@/db/schema';
 
 /**
  * Tenant-specific filter implementation

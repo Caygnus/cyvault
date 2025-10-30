@@ -1,7 +1,7 @@
 import { EntityStatus, SortOrder } from '@/types';
 import { BaseFilter } from './filter';
 import { inArray, like, and } from 'drizzle-orm';
-import { users } from '@/core/db/schema';
+import { users } from '@/db/schema';
 
 /**
  * User-specific filter implementation

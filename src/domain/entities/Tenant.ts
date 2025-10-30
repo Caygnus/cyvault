@@ -1,4 +1,4 @@
-import { Tenant as TenantDB } from '@/core/db/schema';
+import { Tenant as TenantDB } from '@/db/schema';
 import { EntityStatus } from '@/types';
 import { BaseEntity } from './base';
 import { generateUUIDWithPrefix, UUID_PREFIX } from '@/core/utils/uuid';
