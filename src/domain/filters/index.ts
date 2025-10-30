@@ -2,3 +2,4 @@
 export * from './filter';
 export * from './user';
 export * from './tenant';
+export * from './vault';

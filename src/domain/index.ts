@@ -1,11 +1,11 @@
 // Entities
-export { UserEntity, TenantEntity, BaseEntity } from './entities';
+export { UserEntity, TenantEntity, VaultEntity, BaseEntity } from './entities';
 
 // DTOs
 export * from './dto';
 
 // Filters
-export { UserFilter, TenantFilter, BaseFilter } from './filters';
+export { UserFilter, TenantFilter, VaultFilter, BaseFilter } from './filters';
 export * from './filters';
 
 // Repositories

@@ -18,3 +18,10 @@ export {
     TenantUpdateRequest,
     TenantResponse
 } from './tenant';
+
+// Vault DTOs
+export {
+    VaultRequest,
+    VaultUpdateRequest,
+    VaultResponse
+} from './vault';

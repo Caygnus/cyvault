@@ -9,3 +9,9 @@ export {
     type TenantRepository,
     TenantRepositoryImpl
 } from './tenant';
+
+// Vault Repository
+export {
+    type VaultRepository,
+    VaultRepositoryImpl
+} from './vault';
