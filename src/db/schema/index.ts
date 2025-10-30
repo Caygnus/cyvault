@@ -11,3 +11,9 @@ export {
     type Tenant,
     type NewTenant,
 } from './tenant';
+
+export {
+    vaults,
+    type Vault,
+    type NewVault,
+} from './vault';
