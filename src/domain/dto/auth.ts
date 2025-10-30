@@ -8,21 +8,21 @@ export class SignupRequest extends BaseRequestDto {
 
     readonly token: string;        // json "token"
     readonly email: string;        // json "email"
-    readonly tenantName?: string;  // json "tenant_name" (optional)
+    readonly tenant_name?: string;  // json "tenant_name" (optional)
     readonly name?: string;        // json "name" (optional)
 
-    constructor(token: string, email: string, tenantName?: string, name?: string) {
+    constructor(token: string, email: string, tenant_name?: string, name?: string) {
         super();
         this.token = token;
         this.email = email;
-        this.tenantName = tenantName;
+        this.tenant_name = tenant_name;
         this.name = name;
         this.validate();
     }
 
     static async fromRequest(request: NextRequest): Promise<SignupRequest> {
         const body = await request.json();
-        return new SignupRequest(body.token, body.email, body.tenant_name, body.name);
+        return new SignupRequest(body.token, body.email, body.tenant_name ?? undefined, body.name ?? undefined);
     }
 
     validate(): void {
@@ -37,9 +37,9 @@ export class SignupRequest extends BaseRequestDto {
     toDomain(): UserEntity {
         return UserEntity.create({
             id: generateUUIDWithPrefix(UUID_PREFIX.USER),
-            name: this.name ?? this.tenantName ?? "",
+            name: this.name ?? this.tenant_name ?? "",
             email: this.email,
-            avatarUrl: null,
+            avatarUrl: undefined,
             status: EntityStatus.PUBLISHED,
             createdAt: new Date(),
             updatedAt: new Date(),

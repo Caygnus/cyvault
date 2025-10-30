@@ -10,7 +10,7 @@ export class OnboardingServiceImpl implements OnboardingService {
     constructor(private readonly params: RepoParams) { }
 
     async onboardUser(request: SignupRequest, user: UserEntity): Promise<void> {
-        const tenantRequest = new TenantRequest(request.tenantName ?? "", "");
+        const tenantRequest = new TenantRequest(request.tenant_name ?? "", "");
         const tenant = tenantRequest.toDomain();
 
         const { data: tenantData, error: tenantError } = await this.params.tenantRepository.create(tenant);
