@@ -31,7 +31,7 @@ function log(message, color = 'reset') {
 // Dynamic schema reader - automatically reads from Drizzle schema files
 class DynamicSchemaReader {
     constructor() {
-        this.schemaPath = path.join(__dirname, '..', 'src', 'core', 'db', 'schema');
+        this.schemaPath = path.join(__dirname, '..', 'src', 'db', 'schema');
     }
 
     async readSchemaDefinitions() {
@@ -139,9 +139,9 @@ class DynamicSchemaReader {
                 const [, camelCaseName, columnDef] = match.match(/(\w+):\s*([^,}]+)/);
 
                 // Extract the actual database column name from the Drizzle definition
-                // e.g., text("created_at") -> "created_at"
-                const dbNameMatch = columnDef.match(/text\("([^"]+)"\)|timestamp\("([^"]+)"\)/);
-                const dbColumnName = dbNameMatch ? (dbNameMatch[1] || dbNameMatch[2]) : camelCaseName;
+                // e.g., text("created_at") -> "created_at", jsonb("metadata") -> "metadata"
+                const dbNameMatch = columnDef.match(/text\("([^"]+)"\)|timestamp\("([^"]+)"\)|jsonb\("([^"]+)"\)/);
+                const dbColumnName = dbNameMatch ? (dbNameMatch[1] || dbNameMatch[2] || dbNameMatch[3]) : camelCaseName;
 
                 const columnInfo = this.parseColumnDefinition(columnDef.trim());
                 if (columnInfo) {
@@ -172,6 +172,8 @@ class DynamicSchemaReader {
             info.type = 'integer';
         } else if (columnDef.includes('boolean(')) {
             info.type = 'boolean';
+        } else if (columnDef.includes('jsonb(')) {
+            info.type = 'jsonb';
         }
 
         // Extract modifiers - handle Drizzle method chaining
@@ -209,6 +211,10 @@ class DynamicSchemaReader {
             // Handle empty string
             else if (defaultValue === '""') {
                 info.defaultValue = "''";
+            }
+            // Handle empty object for jsonb (default({}))
+            else if (defaultValue === '{}' || defaultValue.trim() === '{}') {
+                info.defaultValue = "'{}'::jsonb";
             }
             else {
                 info.defaultValue = defaultValue;
@@ -453,7 +459,8 @@ class DatabaseMigrator {
                 'character varying': 'text',
                 'varchar': 'text',
                 'timestamp without time zone': 'timestamp',
-                'timestamp with time zone': 'timestamp'
+                'timestamp with time zone': 'timestamp',
+                'jsonb': 'jsonb' // Explicitly include jsonb
             };
             return typeMap[type] || type;
         };
@@ -507,6 +514,16 @@ class DatabaseMigrator {
 
         // Skip if current is now() and expected is null (both are valid timestamp defaults)
         if (currentDefault === 'now()' && (!expectedDefault || expectedDefault === 'null')) {
+            return false;
+        }
+
+        // Skip if both are effectively {} (jsonb defaults)
+        // Handle both '{}' and '{}'::jsonb formats
+        const isJsonbEmpty = (val) => {
+            const cleaned = val.replace(/['"]/g, '').replace(/::jsonb/i, '').trim();
+            return cleaned === '{}';
+        };
+        if (isJsonbEmpty(currentDefault || '') && isJsonbEmpty(expectedDefault || '')) {
             return false;
         }
 
