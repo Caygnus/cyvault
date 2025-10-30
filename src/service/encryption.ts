@@ -42,7 +42,7 @@ export class EncryptionService implements IEncryptionService {
                 .build();
         }
 
-        // Convert the key to a buffer
+        // Convert the key to a buffer 
         let keyBuffer = Buffer.from(encryptionKey, "utf-8");
 
         // Ensure the key is exactly 32 bytes (256 bits) for AES-256

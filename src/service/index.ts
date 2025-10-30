@@ -11,4 +11,4 @@ export { TenantServiceImpl, type TenantService } from './tenant';
 export { OnboardingServiceImpl, type OnboardingService } from './onboarding';
 
 // Encryption Service
-export { EncryptionServiceImpl, type EncryptionService } from './encryption';
+export { EncryptionService, type IEncryptionService } from './encryption';
