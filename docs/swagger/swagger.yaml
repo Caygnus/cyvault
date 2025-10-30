@@ -1,0 +1,643 @@
+openapi: 3.0.0
+info:
+  title: CyVault API
+  version: 1.0.0
+  description: Automatically generated OpenAPI specification for CyVault API
+  contact:
+    name: API Support
+servers:
+  - url: http://localhost:3000
+    description: Development server
+paths:
+  /api/health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the API server and dependency
+        injection system
+      tags:
+        - Health
+      responses:
+        "200":
+          description: object "Health status information"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                required:
+                  - success
+                  - data
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/auth/signup:
+    post:
+      summary: Sign up a new user
+      description: Creates a new user account with email verification token and
+        optional tenant
+      tags:
+        - Authentication
+      responses:
+        "201":
+          description: SignupResponse
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/SignupResponse"
+                required:
+                  - success
+                  - data
+        "400":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+  /api/v1/users/me:
+    get:
+      summary: Get current authenticated user
+      description: Returns the profile information of the currently authenticated user
+      tags:
+        - Users
+      responses:
+        "200":
+          description: UserResponse
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                required:
+                  - success
+                  - data
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerauth: []
+  /api/v1/vaults/{id}:
+    get:
+      summary: Get a vault by ID
+      description: Retrieve a single vault by its unique identifier
+      tags:
+        - Vaults
+      responses:
+        "200":
+          description: VaultResponse
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                required:
+                  - success
+                  - data
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerauth: []
+    put:
+      summary: Update a vault
+      description: Update an existing vault with new details. All fields are optional
+        - only provided fields will be updated.
+      tags:
+        - Vaults
+      responses:
+        "200":
+          description: VaultResponse
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/VaultUpdateResponse"
+                required:
+                  - success
+                  - data
+        "400":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerauth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VaultUpdateRequest"
+    delete:
+      summary: Delete a vault (soft delete)
+      description: Soft deletes a vault by marking it as deleted. The vault data is
+        preserved but no longer accessible.
+      tags:
+        - Vaults
+      responses:
+        "200":
+          description: object "Deletion confirmation message"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                required:
+                  - success
+                  - data
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerauth: []
+  /api/v1/vaults:
+    get:
+      summary: List vaults with optional filtering and pagination
+      description: Retrieve a paginated list of vaults with optional filtering by
+        status, name, color, and date range
+      tags:
+        - Vaults
+      responses:
+        "200":
+          description: array "Array of vaults with pagination"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                required:
+                  - success
+                  - data
+        "400":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerauth: []
+    post:
+      summary: Create a new vault
+      description: Creates a new vault with the provided details. Name is required,
+        other fields are optional.
+      tags:
+        - Vaults
+      responses:
+        "201":
+          description: VaultResponse
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/VaultResponse"
+                required:
+                  - success
+                  - data
+        "400":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: ErrorResponse
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerauth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VaultRequest"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    SignupRequest:
+      type: object
+      properties:
+        token:
+          type: string
+        email:
+          type: string
+        tenantName:
+          type: string
+        name:
+          type: string
+      required:
+        - token
+        - email
+    SignupResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        email:
+          type: string
+      required:
+        - token
+        - email
+    UserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        avatarUrl:
+          type: string
+      required:
+        - name
+        - email
+    UserUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        avatarUrl:
+          type: string
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        avatarUrl:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - status
+        - createdAt
+        - updatedAt
+    UserWithTenantResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+            avatarUrl:
+              type: string
+            status:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+          required:
+            - id
+            - name
+            - email
+            - status
+            - createdAt
+            - updatedAt
+        tenant:
+          type: string
+          format: date-time
+      required:
+        - user
+        - tenant
+    VaultRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        iconUrl:
+          type: string
+        color:
+          type: string
+        metadata:
+          type: string
+      required:
+        - name
+    VaultUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        iconUrl:
+          type: string
+        color:
+          type: string
+        metadata:
+          type: string
+    VaultResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        iconUrl:
+          type: string
+        color:
+          type: string
+        metadata:
+          type: string
+        userId:
+          type: string
+        tenantId:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - userId
+        - tenantId
+        - status
+        - createdAt
+        - updatedAt
+    TenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+        - name
+        - description
+    TenantUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    TenantResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - description
+        - status
+        - createdAt
+        - updatedAt
+    EntityStatus:
+      type: string
+      enum:
+        - published
+        - archived
+        - deleted
+      description: "Enum: EntityStatus"
+    SortOrder:
+      type: string
+      enum:
+        - asc
+        - desc
+      description: "Enum: SortOrder"
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+      required:
+        - success
+        - error
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+      required:
+        - success
+        - data
+security:
+  - bearerAuth: []

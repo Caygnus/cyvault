@@ -2,9 +2,14 @@ import "reflect-metadata";
 import { NextResponse } from "next/server";
 import { ensureBootstrap } from "@/core/di";
 
-/**
- * Health check endpoint
- */
+// GET handles the health check endpoint
+// @Summary Health check endpoint
+// @Description Returns the health status of the API server and dependency injection system
+// @Tags Health
+// @Produce json
+// @Success 200 {object} object "Health status information"
+// @Failure 500 {object} ErrorResponse
+// @Router /api/health [get]
 export async function GET() {
     try {
         // Ensure bootstrap runs once per cold start

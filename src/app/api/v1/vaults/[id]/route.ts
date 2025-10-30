@@ -6,9 +6,17 @@ import { VaultServiceImpl } from "@/service";
 import { VaultUpdateRequest } from "@/domain";
 import { Err } from "@/types";
 
-/**
- * GET /api/vaults/[id] - Get a vault by ID
- */
+// getVaultHandler retrieves a single vault by its unique identifier
+// @Summary Get a vault by ID
+// @Description Retrieve a single vault by its unique identifier
+// @Tags Vaults
+// @Security bearerAuth
+// @Produce json
+// @Param id path string true "Vault unique identifier"
+// @Success 200 {object} VaultResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/v1/vaults/{id} [get]
 async function getVaultHandler(
     request: NextRequest,
     context?: { params: unknown }
@@ -31,9 +39,20 @@ async function getVaultHandler(
     return NextResponse.json(vault.toJson());
 }
 
-/**
- * PUT /api/vaults/[id] - Update a vault
- */
+// updateVaultHandler handles updating an existing vault with new details
+// @Summary Update a vault
+// @Description Update an existing vault with new details. All fields are optional - only provided fields will be updated.
+// @Tags Vaults
+// @Security bearerAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "Vault unique identifier"
+// @Param body body VaultUpdateRequest true "Updated vault details"
+// @Success 200 {object} VaultResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/v1/vaults/{id} [put]
 async function updateVaultHandler(
     request: NextRequest,
     context?: { params: unknown }
@@ -61,9 +80,17 @@ async function updateVaultHandler(
     return NextResponse.json(result.toJson());
 }
 
-/**
- * DELETE /api/vaults/[id] - Delete a vault (soft delete)
- */
+// deleteVaultHandler handles soft deletion of a vault
+// @Summary Delete a vault (soft delete)
+// @Description Soft deletes a vault by marking it as deleted. The vault data is preserved but no longer accessible.
+// @Tags Vaults
+// @Security bearerAuth
+// @Produce json
+// @Param id path string true "Vault unique identifier"
+// @Success 200 {object} object "Deletion confirmation message"
+// @Failure 401 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /api/v1/vaults/{id} [delete]
 async function deleteVaultHandler(
     request: NextRequest,
     context?: { params: unknown }

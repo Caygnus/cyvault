@@ -39,9 +39,24 @@ function parseVaultFilterFromQuery(request: NextRequest): VaultFilter {
     });
 }
 
-/**
- * GET /api/vaults - List vaults with optional filtering and pagination
- */
+// listVaultsHandler retrieves a paginated list of vaults with optional filtering
+// @Summary List vaults with optional filtering and pagination
+// @Description Retrieve a paginated list of vaults with optional filtering by status, name, color, and date range
+// @Tags Vaults
+// @Security bearerAuth
+// @Produce json
+// @Param limit query integer false "Number of items to return"
+// @Param offset query integer false "Number of items to skip"
+// @Param status query EntityStatus false "Filter by status"
+// @Param sort query string false "Sort field"
+// @Param order query SortOrder false "Sort order (asc or desc)"
+// @Param nameContains query string false "Filter by name containing string"
+// @Param color query string false "Filter by color (hex format)"
+// @Param vaultIds query string false "Filter by specific vault IDs (comma-separated)"
+// @Success 200 {object} array "Array of vaults with pagination"
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/v1/vaults [get]
 async function listVaultsHandler(request: NextRequest) {
     await ensureBootstrap();
     const params = getRepoParams();
@@ -53,9 +68,18 @@ async function listVaultsHandler(request: NextRequest) {
     return NextResponse.json(result);
 }
 
-/**
- * POST /api/vaults - Create a new vault
- */
+// createVaultHandler handles the creation of a new vault
+// @Summary Create a new vault
+// @Description Creates a new vault with the provided details. Name is required, other fields are optional.
+// @Tags Vaults
+// @Security bearerAuth
+// @Accept json
+// @Produce json
+// @Param body body VaultRequest true "Vault details"
+// @Success 201 {object} VaultResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/v1/vaults [post]
 async function createVaultHandler(request: NextRequest) {
     await ensureBootstrap();
     const params = getRepoParams();
