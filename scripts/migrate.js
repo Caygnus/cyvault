@@ -5,11 +5,9 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
 
 // Load environment variables
 dotenv.config({ path: '.env' });
@@ -80,7 +78,6 @@ class DynamicSchemaReader {
         if (!tableMatches) return tableDefinitions;
 
         for (const match of tableMatches) {
-            const tableName = match.match(/export\s+const\s+(\w+)\s*=\s*pgTable/)[1];
             const tableSchemaName = match.match(/pgTable\s*\(\s*["']([^"']+)["']/)[1];
             const tableBody = match.match(/pgTable\s*\(\s*["']([^"']+)["']\s*,\s*\{([^}]+)\}/)[2];
 
@@ -93,8 +90,9 @@ class DynamicSchemaReader {
             // Merge base model columns with table columns
             const columns = { ...baseModelColumns, ...tableColumns };
 
-            const indexes = this.parseIndexes(content, tableName);
-            const constraints = this.parseConstraints(content, tableName);
+            const indexes = this.parseIndexes(content);
+            // Extract constraints from columns (references are now parsed with columns)
+            const constraints = this.extractConstraintsFromColumns(columns, tableSchemaName);
 
             tableDefinitions[tableSchemaName] = {
                 columns,
@@ -131,17 +129,54 @@ class DynamicSchemaReader {
     parseColumns(tableBody) {
         const columns = {};
 
-        // Parse individual column definitions - extract both camelCase name and snake_case database name
-        const columnMatches = tableBody.match(/(\w+):\s*([^,}]+)/g);
+        // Parse columns by splitting on commas, but respect nested parentheses
+        // This handles cases like .references(() => users.id)
+        let depth = 0;
+        let currentColumn = '';
 
-        if (columnMatches) {
-            for (const match of columnMatches) {
-                const [, camelCaseName, columnDef] = match.match(/(\w+):\s*([^,}]+)/);
+        for (let i = 0; i < tableBody.length; i++) {
+            const char = tableBody[i];
 
-                // Extract the actual database column name from the Drizzle definition
-                // e.g., text("created_at") -> "created_at", jsonb("metadata") -> "metadata"
-                const dbNameMatch = columnDef.match(/text\("([^"]+)"\)|timestamp\("([^"]+)"\)|jsonb\("([^"]+)"\)/);
-                const dbColumnName = dbNameMatch ? (dbNameMatch[1] || dbNameMatch[2] || dbNameMatch[3]) : camelCaseName;
+            if (char === '(') {
+                depth++;
+                currentColumn += char;
+            } else if (char === ')') {
+                depth--;
+                currentColumn += char;
+            } else if (char === ',' && depth === 0) {
+                // End of column definition
+                if (currentColumn.trim()) {
+                    // Skip spread operators like ...baseModel
+                    if (!currentColumn.trim().startsWith('...')) {
+                        const match = currentColumn.trim().match(/^(\w+):\s*(.+)$/);
+                        if (match) {
+                            const [, camelCaseName, columnDef] = match;
+
+                            // Extract the actual database column name from the Drizzle definition
+                            const dbNameMatch = columnDef.match(/text\("([^"]+)"\)|timestamp\("([^"]+)"\)|jsonb\("([^"]+)"\)|integer\("([^"]+)"\)|boolean\("([^"]+)"\)/);
+                            const dbColumnName = dbNameMatch ? (dbNameMatch[1] || dbNameMatch[2] || dbNameMatch[3] || dbNameMatch[4] || dbNameMatch[5]) : camelCaseName;
+
+                            const columnInfo = this.parseColumnDefinition(columnDef.trim());
+                            if (columnInfo) {
+                                columns[dbColumnName] = columnInfo;
+                            }
+                        }
+                    }
+                }
+                currentColumn = '';
+            } else {
+                currentColumn += char;
+            }
+        }
+
+        // Handle last column (no trailing comma)
+        if (currentColumn.trim() && !currentColumn.trim().startsWith('...')) {
+            const match = currentColumn.trim().match(/^(\w+):\s*(.+)$/);
+            if (match) {
+                const [, camelCaseName, columnDef] = match;
+
+                const dbNameMatch = columnDef.match(/text\("([^"]+)"\)|timestamp\("([^"]+)"\)|jsonb\("([^"]+)"\)|integer\("([^"]+)"\)|boolean\("([^"]+)"\)/);
+                const dbColumnName = dbNameMatch ? (dbNameMatch[1] || dbNameMatch[2] || dbNameMatch[3] || dbNameMatch[4] || dbNameMatch[5]) : camelCaseName;
 
                 const columnInfo = this.parseColumnDefinition(columnDef.trim());
                 if (columnInfo) {
@@ -160,7 +195,8 @@ class DynamicSchemaReader {
             nullable: true,
             primaryKey: false,
             unique: false,
-            defaultValue: null
+            defaultValue: null,
+            reference: null // Add reference info
         };
 
         // Extract type - handle Drizzle syntax like text("column_name")
@@ -188,6 +224,16 @@ class DynamicSchemaReader {
 
         if (columnDef.includes('.unique()')) {
             info.unique = true;
+        }
+
+        // Extract references - handle nested parentheses properly
+        // Match .references(() => tableName.columnName) with proper nesting
+        const refMatch = columnDef.match(/\.references\s*\(\s*\(\)\s*=>\s*(\w+)\.(\w+)\s*\)/);
+        if (refMatch) {
+            info.reference = {
+                table: refMatch[1],
+                column: refMatch[2]
+            };
         }
 
         // Extract default values - handle different default types
@@ -224,7 +270,7 @@ class DynamicSchemaReader {
         return info;
     }
 
-    parseIndexes(content, tableName) {
+    parseIndexes(content) {
         const indexes = [];
 
         // Look for index definitions in the file
@@ -246,25 +292,26 @@ class DynamicSchemaReader {
         return indexes;
     }
 
-    parseConstraints(content, tableName) {
+    extractConstraintsFromColumns(columns, tableSchemaName) {
         const constraints = [];
 
-        // Look for foreign key constraints - handle Drizzle syntax
-        const fkMatches = content.match(/\.references\([^)]+\)/g);
-        if (fkMatches) {
-            for (const fkMatch of fkMatches) {
-                // Handle syntax like .references(() => tenants.id)
-                const refMatch = fkMatch.match(/\.references\(\s*\(\)\s*=>\s*(\w+)\.(\w+)/);
-                if (refMatch) {
-                    constraints.push({
-                        name: `${tableName}_${refMatch[2]}_${refMatch[1]}_fk`,
-                        type: 'FOREIGN KEY',
-                        columns: [refMatch[2]],
-                        references: { table: refMatch[1], column: refMatch[2] },
-                        onDelete: 'no action',
-                        onUpdate: 'no action'
-                    });
-                }
+        // Extract foreign key constraints from columns that have references
+        for (const [columnName, columnDef] of Object.entries(columns)) {
+            if (columnDef.reference) {
+                const refTable = columnDef.reference.table;
+                const refColumn = columnDef.reference.column;
+
+                // Generate constraint name: tableName_columnName_refTable_fk
+                const constraintName = `${tableSchemaName}_${columnName}_${refTable}_fk`;
+
+                constraints.push({
+                    name: constraintName,
+                    type: 'FOREIGN KEY',
+                    columns: [columnName],
+                    references: { table: refTable, column: refColumn },
+                    onDelete: 'no action',
+                    onUpdate: 'no action'
+                });
             }
         }
 
@@ -642,7 +689,7 @@ class DatabaseMigrator {
         }
     }
 
-    async modifyColumn(tableName, columnName, definition) {
+    async modifyColumn(tableName, columnName, _definition) {
         // PostgreSQL doesn't support direct column modification in all cases
         // This is a simplified version - might need more complex logic for production
         log(`⚠️  Column modification for ${tableName}.${columnName} - manual review recommended`, 'yellow');

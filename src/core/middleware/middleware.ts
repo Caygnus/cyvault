@@ -9,6 +9,7 @@ import {
     logError,
     ErrorCode
 } from '@/types';
+import { getTenantIdFromUser } from '@/core/utils/tenant';
 
 export enum UserHeaders {
     USER_ID = 'x-user-id',
@@ -67,7 +68,7 @@ export class MiddlewareService {
                 return this.handleUnauthenticatedRequest(request, pathname);
             }
 
-            return this.setUserContext(request, user!);
+            return await this.setUserContext(request, user!);
 
         } catch {
             return NextResponse.next();
@@ -119,7 +120,7 @@ export class MiddlewareService {
         }
     }
 
-    private static setUserContext(request: NextRequest, user: User): NextResponse {
+    private static async setUserContext(request: NextRequest, user: User): Promise<NextResponse> {
         if (!user) return NextResponse.next();
 
         const response = NextResponse.next({
@@ -131,16 +132,15 @@ export class MiddlewareService {
         request.headers.set(UserHeaders.USER_ID, user.id || '');
         request.headers.set(UserHeaders.USER_EMAIL, user.email || '');
 
-        const tenantId = this.extractTenantIdFromUser(user);
+        // Get tenant ID (checks metadata first, then database)
+        const tenantId = await getTenantIdFromUser(user);
         if (tenantId) {
             request.headers.set(UserHeaders.TENANT_ID, tenantId);
+            response.headers.set(UserHeaders.TENANT_ID, tenantId);
         }
 
         response.headers.set(UserHeaders.USER_ID, user.id || '');
         response.headers.set(UserHeaders.USER_EMAIL, user.email || '');
-        if (tenantId) {
-            response.headers.set(UserHeaders.TENANT_ID, tenantId);
-        }
 
         this.initializeRequestContext(request, user, tenantId);
 
@@ -193,12 +193,6 @@ export class MiddlewareService {
         }
     }
 
-    private static extractTenantIdFromUser(user: User | null): string | null {
-        if (!user) return null;
-        const userMetadata = user.user_metadata || {};
-        const appMetadata = user.app_metadata || {};
-        return userMetadata.tenant_id || appMetadata.tenant_id || null;
-    }
 
     static isUserAuthenticated(user: User | null): boolean {
         return !!(user && user.id);

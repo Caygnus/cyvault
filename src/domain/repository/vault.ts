@@ -28,8 +28,13 @@ export class VaultRepositoryImpl implements VaultRepository {
      */
     private getTenantIdFromContext(): string {
         try {
-            return RequestContext.getTenantId();
-        } catch {
+            const tenantId = RequestContext.getTenantId();
+            console.log('[VaultRepository] getTenantIdFromContext - tenantId:', tenantId);
+            return tenantId;
+        } catch (error) {
+            console.error('[VaultRepository] Failed to get tenant ID from context:', error);
+            console.error('[VaultRepository] Has context:', RequestContext.hasContext());
+            console.error('[VaultRepository] Try get tenant ID:', RequestContext.tryGetTenantId());
             throw Err.unauthorized('Tenant ID is required for vault operations')
                 .build();
         }
@@ -60,7 +65,7 @@ export class VaultRepositoryImpl implements VaultRepository {
     private getUserCondition() {
         const userId = this.tryGetUserIdFromContext();
         if (!userId) return null;
-        return eq(vaults.userId, userId);
+        return eq(vaults.createdBy, userId);
     }
 
     async create(vault: VaultEntity): Promise<{ data: VaultEntity, error: AppError | null }> {
@@ -103,6 +108,9 @@ export class VaultRepositoryImpl implements VaultRepository {
     async findAll(filter: VaultFilter = VaultFilter.createDefault()): Promise<{ data: VaultEntity[], error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
+                console.log('[VaultRepository] findAll - hasContext:', RequestContext.hasContext());
+                console.log('[VaultRepository] findAll - tryGetTenantId:', RequestContext.tryGetTenantId());
+
                 filter.validate();
 
                 // Build conditions from filter
@@ -110,6 +118,7 @@ export class VaultRepositoryImpl implements VaultRepository {
 
                 // Always add tenant ID condition (cannot be overridden)
                 const tenantCondition = this.getTenantCondition();
+                console.log('[VaultRepository] findAll - tenantCondition:', tenantCondition);
                 const allConditions = [...conditions, tenantCondition];
 
                 // Always add user ID condition if user is in context (cannot be overridden)
@@ -127,9 +136,12 @@ export class VaultRepositoryImpl implements VaultRepository {
                 // Apply sorting and pagination from filter
                 query = filter.applyBaseFilters(query, vaults) as typeof query;
 
+                console.log('[VaultRepository] findAll - executing query');
                 const results = await query;
+                console.log('[VaultRepository] findAll - results count:', results.length);
                 return { data: results.map(VaultEntity.fromDB), error: null };
             } catch (error) {
+                console.error('[VaultRepository] findAll - error:', error);
                 throw Err.database('Failed to find all vaults', error as Error)
                     .withDetails({ filter: JSON.stringify(filter) })
                     .build();
