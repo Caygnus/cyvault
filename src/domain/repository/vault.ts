@@ -48,26 +48,6 @@ export class VaultRepositoryImpl implements VaultRepository {
         return eq(vaults.tenantId, tenantId);
     }
 
-    /**
-     * Helper method to get user ID from context (optional - only used for user-scoped queries)
-     */
-    private tryGetUserIdFromContext(): string | null {
-        try {
-            return RequestContext.getUserId();
-        } catch {
-            return null;
-        }
-    }
-
-    /**
-     * Helper method to get user ID condition (returns null if no user ID in context)
-     */
-    private getUserCondition() {
-        const userId = this.tryGetUserIdFromContext();
-        if (!userId) return null;
-        return eq(vaults.createdBy, userId);
-    }
-
     async create(vault: VaultEntity): Promise<{ data: VaultEntity, error: AppError | null }> {
         return withErrorHandling(async () => {
             try {
@@ -86,12 +66,6 @@ export class VaultRepositoryImpl implements VaultRepository {
             try {
                 const tenantId = this.getTenantIdFromContext();
                 const conditions = [eq(vaults.id, id), eq(vaults.tenantId, tenantId)];
-
-                // Always add user ID condition if user is in context (cannot be overridden)
-                const userCondition = this.getUserCondition();
-                if (userCondition) {
-                    conditions.push(userCondition);
-                }
 
                 const [result] = await this.db.select()
                     .from(vaults)
@@ -120,12 +94,6 @@ export class VaultRepositoryImpl implements VaultRepository {
                 const tenantCondition = this.getTenantCondition();
                 console.log('[VaultRepository] findAll - tenantCondition:', tenantCondition);
                 const allConditions = [...conditions, tenantCondition];
-
-                // Always add user ID condition if user is in context (cannot be overridden)
-                const userCondition = this.getUserCondition();
-                if (userCondition) {
-                    allConditions.push(userCondition);
-                }
 
                 // Start with base query
                 let query = this.db.select().from(vaults);
@@ -160,12 +128,6 @@ export class VaultRepositoryImpl implements VaultRepository {
                 // Always add tenant ID condition (cannot be overridden)
                 const tenantCondition = this.getTenantCondition();
                 const allConditions = [...conditions, tenantCondition];
-
-                // Always add user ID condition if user is in context (cannot be overridden)
-                const userCondition = this.getUserCondition();
-                if (userCondition) {
-                    allConditions.push(userCondition);
-                }
 
                 let query = this.db.select().from(vaults);
 

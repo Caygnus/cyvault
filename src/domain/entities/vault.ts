@@ -10,7 +10,6 @@ export interface VaultEntityParams {
     iconUrl?: string | null;
     color?: string | null;
     metadata?: Record<string, string> | null;
-    userId: string;
     tenantId: string;
     status?: EntityStatus;
     createdAt?: Date;
@@ -27,7 +26,6 @@ export class VaultEntity extends BaseEntity {
         public readonly iconUrl: string | null,
         public readonly color: string | null,
         public readonly metadata: Record<string, string> | null,
-        public readonly userId: string,
         public readonly tenantId: string,
         status: EntityStatus,
         createdAt: Date,
@@ -46,7 +44,6 @@ export class VaultEntity extends BaseEntity {
             vault.iconUrl,
             vault.color,
             vault.metadata || null,
-            vault.userId,
             vault.tenantId,
             vault.status as EntityStatus,
             vault.createdAt,
@@ -64,7 +61,6 @@ export class VaultEntity extends BaseEntity {
             iconUrl: this.iconUrl,
             color: this.color,
             metadata: this.metadata || {},
-            userId: this.userId,
             tenantId: this.tenantId,
             status: this.status,
             createdBy: this.createdBy,
@@ -85,7 +81,6 @@ export class VaultEntity extends BaseEntity {
             iconUrl: this.iconUrl,
             color: this.color,
             metadata: this.metadata || {},
-            userId: this.userId,
             tenantId: this.tenantId,
             status: this.status,
             createdBy: this.createdBy,
@@ -103,7 +98,6 @@ export class VaultEntity extends BaseEntity {
             (updates as Partial<VaultEntity>).iconUrl ?? this.iconUrl,
             (updates as Partial<VaultEntity>).color ?? this.color,
             (updates as Partial<VaultEntity>).metadata ?? this.metadata,
-            (updates as Partial<VaultEntity>).userId ?? this.userId,
             (updates as Partial<VaultEntity>).tenantId ?? this.tenantId,
             (updates as Partial<VaultEntity>).status ?? this.status,
             (updates as Partial<VaultEntity>).createdAt ?? this.createdAt,
@@ -124,7 +118,6 @@ export class VaultEntity extends BaseEntity {
             updates.iconUrl ?? this.iconUrl,
             updates.color ?? this.color,
             updates.metadata ?? this.metadata,
-            updates.userId ?? this.userId,
             updates.tenantId ?? this.tenantId,
             updates.status ?? this.status,
             updates.createdAt ?? this.createdAt,
@@ -146,7 +139,6 @@ export class VaultEntity extends BaseEntity {
             params.iconUrl ?? null,
             params.color ?? null,
             params.metadata ?? null,
-            params.userId,
             params.tenantId,
             params.status ?? EntityStatus.PUBLISHED,
             params.createdAt ?? now,

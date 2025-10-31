@@ -58,7 +58,6 @@ export class VaultRequest extends BaseRequestDto {
     }
 
     toDomain(): VaultEntity {
-        const userId = RequestContext.tryGetUserId();
         const tenantId = RequestContext.getTenantId();
 
         return VaultEntity.create({
@@ -67,10 +66,9 @@ export class VaultRequest extends BaseRequestDto {
             iconUrl: this.iconUrl || null,
             color: this.color || null,
             metadata: this.metadata || null,
-            userId: userId || "",
             tenantId: tenantId || "",
-            updatedBy: userId,
-            createdBy: userId,
+            updatedBy: RequestContext.tryGetUserId(),
+            createdBy: RequestContext.tryGetUserId(),
         });
     }
 }
@@ -134,7 +132,6 @@ export class VaultResponse extends BaseResponseDto {
     readonly iconUrl: string | null;
     readonly color: string | null;
     readonly metadata: Record<string, string> | null;
-    readonly userId: string;
     readonly tenantId: string;
     readonly status: string;
     readonly createdAt: Date;
@@ -148,7 +145,6 @@ export class VaultResponse extends BaseResponseDto {
         this.iconUrl = vault.iconUrl;
         this.color = vault.color;
         this.metadata = vault.metadata;
-        this.userId = vault.userId;
         this.tenantId = vault.tenantId;
         this.status = vault.status;
         this.createdAt = vault.createdAt;
@@ -167,7 +163,6 @@ export class VaultResponse extends BaseResponseDto {
             iconUrl: this.iconUrl,
             color: this.color,
             metadata: this.metadata,
-            userId: this.userId,
             tenantId: this.tenantId,
             status: this.status,
             createdAt: this.createdAt,
