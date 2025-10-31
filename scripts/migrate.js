@@ -113,8 +113,8 @@ class DynamicSchemaReader {
             if (fs.existsSync(baseModelPath)) {
                 const baseContent = fs.readFileSync(baseModelPath, 'utf8');
 
-                // Extract baseModel definition
-                const baseModelMatch = baseContent.match(/export\s+const\s+baseModel\s*=\s*\{([^}]+)\}/s);
+                // Extract baseModel definition - handle both with and without "as const"
+                const baseModelMatch = baseContent.match(/export\s+const\s+baseModel\s*=\s*\{([\s\S]+?)\}\s*(?:as\s+const)?/);
                 if (baseModelMatch) {
                     const baseModelBody = baseModelMatch[1];
                     const baseColumns = this.parseColumns(baseModelBody);
@@ -466,6 +466,21 @@ class DatabaseMigrator {
                 }
             }
 
+            // Check for columns that exist in DB but not in schema (should be dropped)
+            for (const [columnName, columnDef] of Object.entries(currentTable.columns)) {
+                if (!expectedSchema.columns[columnName]) {
+                    // Skip system columns that shouldn't be dropped
+                    if (columnName === 'id' || columnName === 'created_at' || columnName === 'updated_at') {
+                        continue;
+                    }
+                    changes.push({
+                        type: 'DROP_COLUMN',
+                        table: tableName,
+                        column: columnName
+                    });
+                }
+            }
+
             // Check for missing indexes
             for (const expectedIndex of expectedSchema.indexes) {
                 const existingIndex = currentTable.indexes.find(idx =>
@@ -491,6 +506,34 @@ class DatabaseMigrator {
                         table: tableName,
                         constraint: expectedConstraint
                     });
+                }
+            }
+
+            // Check for constraints that exist in DB but not in schema (should be dropped)
+            for (const existingConstraint of currentTable.constraints) {
+                // Check if this constraint references a column that no longer exists
+                const columnStillExists = existingConstraint.column
+                    ? expectedSchema.columns[existingConstraint.column]
+                    : true;
+
+                if (!columnStillExists) {
+                    changes.push({
+                        type: 'DROP_CONSTRAINT',
+                        table: tableName,
+                        constraint: existingConstraint
+                    });
+                } else {
+                    // Check if constraint exists in expected schema
+                    const constraintExists = expectedSchema.constraints.find(con =>
+                        con.name === existingConstraint.name
+                    );
+                    if (!constraintExists && existingConstraint.type === 'FOREIGN KEY') {
+                        changes.push({
+                            type: 'DROP_CONSTRAINT',
+                            table: tableName,
+                            constraint: existingConstraint
+                        });
+                    }
                 }
             }
         }
@@ -635,6 +678,12 @@ class DatabaseMigrator {
             case 'ADD_CONSTRAINT':
                 await this.addConstraint(change.table, change.constraint);
                 break;
+            case 'DROP_COLUMN':
+                await this.dropColumn(change.table, change.column);
+                break;
+            case 'DROP_CONSTRAINT':
+                await this.dropConstraint(change.table, change.constraint);
+                break;
         }
     }
 
@@ -716,6 +765,24 @@ class DatabaseMigrator {
                 ON DELETE ${onDelete} ON UPDATE ${onUpdate}
             `);
         }
+    }
+
+    async dropConstraint(tableName, constraint) {
+        await this.sql.unsafe(`ALTER TABLE "${tableName}" DROP CONSTRAINT IF EXISTS "${constraint.name}"`);
+    }
+
+    async dropColumn(tableName, columnName) {
+        // First, drop any foreign key constraints that reference this column
+        const constraints = await this.getTableConstraints(tableName);
+        for (const constraint of constraints) {
+            if (constraint.column === columnName && constraint.type === 'FOREIGN KEY') {
+                log(`⚠️  Dropping foreign key constraint ${constraint.name} before dropping column ${columnName}`, 'yellow');
+                await this.dropConstraint(tableName, constraint);
+            }
+        }
+
+        // Now drop the column
+        await this.sql.unsafe(`ALTER TABLE "${tableName}" DROP COLUMN IF EXISTS "${columnName}"`);
     }
 
     async close() {
